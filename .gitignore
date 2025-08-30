@@ -52,3 +52,12 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Visual Studio temporary files
+.vs/
+
+# Reference project
+reference_project/
+*.csproj.user
+maliev-shared-secrets.yaml
+*.xml
