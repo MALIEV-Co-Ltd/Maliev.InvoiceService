@@ -16,9 +16,9 @@ The API follows a RESTful design, with clear, hierarchical routes. The base addr
 
 ### Invoices
 
-*   **GET /api/invoices**: Retrieve a paginated collection of all invoices.
+*   **GET /invoices**: Retrieve a paginated collection of all invoices.
     *   Query Parameters: `pageNumber`, `pageSize`
-    *   Example: `GET https://api.maliev.com/api/invoices?pageNumber=1&pageSize=10`
+    *   Example: `GET https://api.maliev.com/invoices?pageNumber=1&pageSize=10`
 *   **GET /api/invoices/{id}**: Retrieve a specific invoice by its unique ID.
 *   **GET /api/invoices/by-number/{number}**: Retrieve a specific invoice by its unique invoice number.
 *   **POST /api/invoices**: Create a new invoice.
@@ -30,15 +30,15 @@ The API follows a RESTful design, with clear, hierarchical routes. The base addr
 *   **GET /api/invoices/{invoiceId}/file**: Retrieve the invoice file (PDF) associated with a specific invoice.
 *   **POST /api/invoices/{invoiceId}/file**: Upload/create the invoice file for a specific invoice.
 *   **PUT /api/invoices/{invoiceId}/file**: Update the invoice file for a specific invoice.
-*   **DELETE /api/invoices/{invoiceId}/file**: Delete the invoice file associated with a specific invoice.
+*   **DELETE /invoices/{invoiceId}/file**: Delete the invoice file associated with a specific invoice.
 
 ### Order Items
 
 *   **GET /api/invoices/{invoiceId}/order-items**: Retrieve all order items belonging to a specific invoice.
 *   **GET /api/invoices/{invoiceId}/order-items/{orderItemId}**: Retrieve a specific order item for a specific invoice.
-*   **POST /api/invoices/{invoiceId}/order-items**: Create a new order item for a specific invoice.
+*   **POST /invoices/{invoiceId}/order-items**: Create a new order item for a specific invoice.
 *   **PUT /api/invoices/{invoiceId}/order-items/{orderItemId}**: Fully update a specific order item for a specific invoice.
-*   **DELETE /api/invoices/{invoiceId}/order-items/{orderItemId}**: Delete a specific order item for a specific invoice.
+*   **DELETE /invoices/{invoiceId}/order-items/{orderItemId}**: Delete a specific order item for a specific invoice.
 
 ## Build Instructions
 

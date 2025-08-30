@@ -61,3 +61,6 @@ reference_project/
 *.csproj.user
 maliev-shared-secrets.yaml
 *.xml
+
+.gemini/
+gha-creds-*.json

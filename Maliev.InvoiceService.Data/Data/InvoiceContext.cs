@@ -7,23 +7,45 @@ using Maliev.InvoiceService.Data.Models;
 
 namespace Maliev.InvoiceService.Data.Data
 {
+    /// <summary>
+    /// Represents the database context for the InvoiceService.
+    /// </summary>
     public partial class InvoiceContext : DbContext
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InvoiceContext"/> class.
+        /// </summary>
         public InvoiceContext()
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InvoiceContext"/> class with the specified options.
+        /// </summary>
+        /// <param name="options">The options for this context.</param>
         public InvoiceContext(DbContextOptions<InvoiceContext> options)
             : base(options)
         {
         }
 
+        /// <summary>
+        /// Gets or sets the Invoices DbSet.
+        /// </summary>
         public virtual DbSet<Invoice> Invoices { get; set; }
+        /// <summary>
+        /// Gets or sets the InvoiceFiles DbSet.
+        /// </summary>
         public virtual DbSet<InvoiceFile> InvoiceFiles { get; set; }
+        /// <summary>
+        /// Gets or sets the OrderItems DbSet.
+        /// </summary>
         public virtual DbSet<OrderItem> OrderItems { get; set; }
 
-        
-
+        /// <summary>
+        /// Configures the model that was discovered by convention from the entity types
+        /// exposed in <see cref="T:Microsoft.EntityFrameworkCore.DbSet`1" /> properties on this context.
+        /// </summary>
+        /// <param name="modelBuilder">The builder being used to construct the model for this context.</param>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Invoice>(entity =>

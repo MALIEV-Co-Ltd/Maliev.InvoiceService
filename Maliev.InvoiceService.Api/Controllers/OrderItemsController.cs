@@ -14,7 +14,7 @@ namespace Maliev.InvoiceService.Api.Controllers
     /// Controller for managing order items.
     /// </summary>
     /// <seealso cref="Microsoft.AspNetCore.Mvc.ControllerBase" />
-    [Route("api/invoices/{invoiceId}/order-items")]
+    [Route("invoices/{invoiceId}/order-items")]
     [ApiController]
     [ApiConventionType(typeof(DefaultApiConventions))]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]

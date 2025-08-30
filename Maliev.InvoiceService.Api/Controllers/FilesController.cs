@@ -14,7 +14,7 @@ namespace Maliev.InvoiceService.Api.Controllers
     /// Controller for managing invoice files.
     /// </summary>
     /// <seealso cref="Microsoft.AspNetCore.Mvc.ControllerBase" />
-    [Route("api/invoices/{invoiceId}/file")]
+    [Route("invoices/{invoiceId}/file")]
     [ApiController]
     [ApiConventionType(typeof(DefaultApiConventions))]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
