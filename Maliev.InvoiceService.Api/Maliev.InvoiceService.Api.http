@@ -1,0 +1,163 @@
+@InvoiceService_HostAddress = http://localhost:5000
+@InvoiceService_HostAddress_Https = https://localhost:5001
+
+# NOTE: PostgreSQL runs on port 5433 (not 5432) to avoid conflicts with native installations
+
+###
+# Health Checks
+###
+
+### Liveness Check
+GET {{InvoiceService_HostAddress}}/invoices/liveness
+Accept: application/json
+
+### Readiness Check
+GET {{InvoiceService_HostAddress}}/invoices/readiness
+Accept: application/json
+
+### Prometheus Metrics
+GET {{InvoiceService_HostAddress}}/invoices/metrics
+
+###
+# Invoice Management
+###
+
+### Create Draft Invoice
+POST {{InvoiceService_HostAddress}}/invoices/v1/invoices
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "customerId": "123e4567-e89b-12d3-a456-426614174000",
+  "customerName": "ACME Corporation Ltd.",
+  "customerTaxId": "1234567890123",
+  "billingAddress": "123 Main Street, Bangkok, Thailand 10110",
+  "currency": "THB",
+  "issueDate": "2025-01-14",
+  "dueDate": "2025-02-13",
+  "paymentTermsDays": 30,
+  "lines": [
+    {
+      "lineNumber": 1,
+      "itemCode": "PROD-001",
+      "description": "3D Printed Prototype Model",
+      "quantity": 5,
+      "unitPrice": 2500.00,
+      "discountPercentage": 0,
+      "taxCategory": "VAT",
+      "taxRate": 7.00
+    }
+  ]
+}
+
+### Get Invoice by ID
+# Replace {invoice-id} with actual GUID
+GET {{InvoiceService_HostAddress}}/invoices/v1/invoices/{invoice-id}
+Accept: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+### Get Paginated Invoices
+GET {{InvoiceService_HostAddress}}/invoices/v1/invoices?page=1&pageSize=20
+Accept: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+### Finalize Invoice
+# Replace {invoice-id} with actual GUID
+POST {{InvoiceService_HostAddress}}/invoices/v1/invoices/{invoice-id}/finalize
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "finalizedBy": "test-user"
+}
+
+### Split Invoice
+# Replace {invoice-id} with actual GUID
+POST {{InvoiceService_HostAddress}}/invoices/v1/invoices/{invoice-id}/split
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "splitRules": [
+    {
+      "percentage": 40.0,
+      "note": "Payment 1 of 2"
+    },
+    {
+      "percentage": 60.0,
+      "note": "Payment 2 of 2"
+    }
+  ]
+}
+
+### Cancel Invoice
+# Replace {invoice-id} with actual GUID
+POST {{InvoiceService_HostAddress}}/invoices/v1/invoices/{invoice-id}/cancel
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "reason": "Customer cancelled order",
+  "cancelledBy": "test-user"
+}
+
+###
+# Payment Allocation
+###
+
+### Link Payment to Invoice
+# Replace {invoice-id} with actual GUID
+POST {{InvoiceService_HostAddress}}/invoices/v1/payments/invoices/{invoice-id}/link
+Content-Type: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+{
+  "paymentId": "223e4567-e89b-12d3-a456-426614174000",
+  "allocatedAmount": 20000.00,
+  "allocatedBy": "test-user"
+}
+
+###
+# PDF/File Reference
+###
+
+### Register PDF File Reference (Upload Service callback - no auth)
+# Replace {invoice-id} with actual GUID
+PATCH {{InvoiceService_HostAddress}}/invoices/v1/invoices/{invoice-id}/pdf-reference
+Content-Type: application/json
+
+{
+  "pdfFileReference": "https://storage.googleapis.com/maliev-invoices/INV-2025-00001.pdf"
+}
+
+###
+# Audit Trail
+###
+
+### Get Invoice Audit Log
+# Replace {invoice-id} with actual GUID
+GET {{InvoiceService_HostAddress}}/invoices/v1/audit/invoices/{invoice-id}
+Accept: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+###
+# Analytics
+###
+
+### Get Invoice Analytics
+GET {{InvoiceService_HostAddress}}/invoices/v1/invoices/analytics?startDate=2025-01-01&endDate=2025-12-31
+Accept: application/json
+Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+###
+# API Documentation
+###
+
+### Scalar UI (Browser)
+# Open in browser: https://localhost:5001/invoices/scalar/v1
+
+### OpenAPI Specification
+GET {{InvoiceService_HostAddress_Https}}/openapi/v1.json
+Accept: application/json
+
+###
