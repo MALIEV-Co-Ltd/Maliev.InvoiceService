@@ -98,7 +98,7 @@ public class PaymentLinkingTests : IAsyncLifetime
         var updatedInvoice = await linkResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         updatedInvoice.Should().NotBeNull();
-        updatedInvoice!.Status.Should().Be("Paid");
+        updatedInvoice!.Status.Should().Be("FullyPaid");
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class PaymentLinkingTests : IAsyncLifetime
         var updatedInvoice = await linkResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         updatedInvoice.Should().NotBeNull();
-        updatedInvoice!.Status.Should().Be("Paid");
+        updatedInvoice!.Status.Should().Be("FullyPaid");
     }
 
     private async Task<Guid> CreateAndFinalizeInvoiceAsync(decimal grandTotal)
