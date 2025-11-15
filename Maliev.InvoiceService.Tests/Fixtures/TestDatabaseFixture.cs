@@ -52,8 +52,9 @@ public class TestDatabaseFixture : IAsyncLifetime
         // TRUNCATE is faster and cleaner for test cleanup
         await context.Database.ExecuteSqlRawAsync(@"
             TRUNCATE TABLE audit_logs CASCADE;
-            TRUNCATE TABLE invoice_payments CASCADE;
+            TRUNCATE TABLE invoice_payment_allocations CASCADE;
             TRUNCATE TABLE invoice_lines CASCADE;
+            TRUNCATE TABLE file_references CASCADE;
             TRUNCATE TABLE invoices CASCADE;
             TRUNCATE TABLE payments CASCADE;
         ");
