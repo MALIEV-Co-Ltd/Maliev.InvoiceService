@@ -16,7 +16,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "9.x"
+          dotnet-version: "10.x"
 
       - name: Restore dependencies
         run: dotnet restore Maliev.InvoiceService.sln
@@ -95,7 +95,6 @@ jobs:
           gh pr create \
             --title "Deploy invoice-service ${{ github.sha }} to production" \
             --body "$PR_BODY" \
-            --base main \
             --base main \
             --head $BRANCH_NAME \
             --repo MALIEV-Co-Ltd/maliev-gitops

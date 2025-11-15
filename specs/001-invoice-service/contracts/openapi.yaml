@@ -1,0 +1,1269 @@
+openapi: 3.1.0
+info:
+  title: Invoice Management Service API
+  version: 1.0.0
+  description: |
+    Comprehensive Invoice Management Service for MALIEV Co. Ltd.
+
+    This service serves as the single source of truth for all invoice-related data, handling:
+    - Invoice creation (from quotations or manual entry)
+    - Invoice splitting and reconciliation
+    - Payment tracking and allocation
+    - Currency conversion with exchange rate persistence
+    - Comprehensive audit trails with 7-year retention
+    - Integration with Currency, Quotation, PDF, and Upload services
+
+    **Authentication**: JWT Bearer tokens required (except health endpoints)
+
+    **Authorization**: Role-based access control (RBAC) with policies:
+    - Customer: View own invoices
+    - Employee: Create and edit draft invoices
+    - Manager: Finalize and cancel invoices
+    - Admin: Full access including audit logs
+
+    **Base Path**: `/invoices/v1`
+
+    **Scalar UI**: Available at `/invoices/scalar/v1` (development only)
+  contact:
+    name: MALIEV Co. Ltd. API Team
+    email: api@maliev.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://dev.api.maliev.com
+    description: Development environment
+  - url: https://staging.api.maliev.com
+    description: Staging environment
+  - url: https://api.maliev.com
+    description: Production environment
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Invoices
+    description: Invoice creation, retrieval, finalization, and cancellation
+  - name: Payments
+    description: Payment recording and allocation
+  - name: Audit
+    description: Audit trail and compliance
+  - name: Health
+    description: Health checks and monitoring
+
+paths:
+  # ========================================
+  # Invoice Endpoints
+  # ========================================
+
+  /invoices/v1/invoices:
+    get:
+      tags:
+        - Invoices
+      summary: Search invoices
+      description: |
+        Search and filter invoices with pagination support.
+        Supports filtering by customer, status, currency, date ranges, and more.
+      operationId: searchInvoices
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - $ref: '#/components/parameters/CustomerNameParam'
+        - $ref: '#/components/parameters/CustomerTaxIdParam'
+        - $ref: '#/components/parameters/QuotationReferenceParam'
+        - $ref: '#/components/parameters/PONumberParam'
+        - $ref: '#/components/parameters/InvoiceNumberParam'
+        - $ref: '#/components/parameters/StatusParam'
+        - $ref: '#/components/parameters/CurrencyParam'
+        - $ref: '#/components/parameters/IssueDateFromParam'
+        - $ref: '#/components/parameters/IssueDateToParam'
+        - $ref: '#/components/parameters/DueDateFromParam'
+        - $ref: '#/components/parameters/DueDateToParam'
+        - $ref: '#/components/parameters/IncludeCancelledParam'
+        - $ref: '#/components/parameters/SortByParam'
+      responses:
+        '200':
+          description: Successful search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Invoices
+      summary: Create invoice
+      description: |
+        Create a new invoice in draft status.
+        Can be created from a quotation reference or manually.
+      operationId: createInvoice
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice created successfully
+          headers:
+            Location:
+              description: URI of the created invoice
+              schema:
+                type: string
+                format: uri
+                example: /invoices/v1/invoices/123e4567-e89b-12d3-a456-426614174000
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /invoices/v1/invoices/{id}:
+    get:
+      tags:
+        - Invoices
+      summary: Get invoice by ID
+      description: Retrieve a single invoice with all details including line items
+      operationId: getInvoiceById
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      responses:
+        '200':
+          description: Invoice retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Invoices
+      summary: Update draft invoice
+      description: |
+        Update a draft invoice. Only draft invoices can be updated.
+        Finalized invoices are immutable.
+      operationId: updateInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInvoiceRequest'
+      responses:
+        '200':
+          description: Invoice updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Invoices
+      summary: Delete draft invoice
+      description: |
+        Soft delete a draft invoice. Only draft invoices can be deleted.
+        Finalized invoices must be cancelled instead.
+      operationId: deleteInvoice
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      responses:
+        '204':
+          description: Invoice deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /invoices/v1/invoices/{id}/finalize:
+    post:
+      tags:
+        - Invoices
+      summary: Finalize invoice
+      description: |
+        Finalize a draft invoice. This action:
+        - Assigns a unique sequential invoice number
+        - Locks the record as immutable
+        - Validates all mandatory fields
+        - Creates audit log entry
+      operationId: finalizeInvoice
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  maxLength: 1000
+                  description: Optional notes for finalization
+      responses:
+        '200':
+          description: Invoice finalized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /invoices/v1/invoices/{id}/cancel:
+    post:
+      tags:
+        - Invoices
+      summary: Cancel invoice
+      description: |
+        Cancel a finalized invoice. Requires a mandatory reason.
+        Cancelled invoices are excluded from default searches.
+      operationId: cancelInvoice
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 10
+                  maxLength: 2000
+                  description: Reason for cancellation (mandatory)
+                  example: Customer requested cancellation due to order error
+      responses:
+        '200':
+          description: Invoice cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /invoices/v1/invoices/{id}/split:
+    post:
+      tags:
+        - Invoices
+      summary: Split invoice into child invoices
+      description: |
+        Split a finalized invoice into multiple child invoices.
+        Supports percentage-based or fixed-amount splits.
+        Sum of child totals must equal parent total.
+      operationId: splitInvoice
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SplitInvoiceRequest'
+      responses:
+        '201':
+          description: Child invoices created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  parentInvoiceId:
+                    type: string
+                    format: uuid
+                  childInvoices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ========================================
+  # Payment Endpoints
+  # ========================================
+
+  /invoices/v1/payments:
+    get:
+      tags:
+        - Payments
+      summary: List payments
+      description: Retrieve all payments with pagination
+      operationId: listPayments
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Successful payment list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPaymentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Payments
+      summary: Record payment
+      description: |
+        Record a payment received from a customer.
+        Payment can be allocated to one or more invoices.
+      operationId: recordPayment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /invoices/v1/payments/{id}:
+    get:
+      tags:
+        - Payments
+      summary: Get payment by ID
+      description: Retrieve a single payment with allocation details
+      operationId: getPaymentById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ========================================
+  # Audit Endpoints
+  # ========================================
+
+  /invoices/v1/audit/invoices/{id}:
+    get:
+      tags:
+        - Audit
+      summary: Get audit trail for invoice
+      description: |
+        Retrieve complete audit trail for a specific invoice.
+        Includes all lifecycle events with timestamps and actor information.
+      operationId: getInvoiceAuditTrail
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InvoiceIdParam'
+      responses:
+        '200':
+          description: Audit trail retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoiceId:
+                    type: string
+                    format: uuid
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLogResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ========================================
+  # Health Check Endpoints
+  # ========================================
+
+  /invoices/liveness:
+    get:
+      tags:
+        - Health
+      summary: Liveness probe
+      description: Simple health check indicating the service is alive
+      operationId: livenessCheck
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: Healthy
+                  service:
+                    type: string
+                    example: Invoice Service
+
+  /invoices/readiness:
+    get:
+      tags:
+        - Health
+      summary: Readiness probe
+      description: |
+        Health check indicating the service is ready to serve traffic.
+        Checks database connectivity and critical dependencies.
+      operationId: readinessCheck
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: Healthy
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: Healthy
+                      redis:
+                        type: string
+                        example: Healthy
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: Unhealthy
+                  checks:
+                    type: object
+
+# ========================================
+# Components
+# ========================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Bearer token authentication.
+        Required claims: NameIdentifier, Name, Email, Role, userType
+
+  parameters:
+    InvoiceIdParam:
+      name: id
+      in: path
+      required: true
+      description: Invoice UUID
+      schema:
+        type: string
+        format: uuid
+        example: 123e4567-e89b-12d3-a456-426614174000
+
+    PageParam:
+      name: page
+      in: query
+      description: Page number (0-indexed)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    PageSizeParam:
+      name: pageSize
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+
+    CustomerNameParam:
+      name: customerName
+      in: query
+      description: Filter by customer name (partial match)
+      schema:
+        type: string
+        maxLength: 500
+
+    CustomerTaxIdParam:
+      name: customerTaxId
+      in: query
+      description: Filter by customer tax ID (exact match)
+      schema:
+        type: string
+        maxLength: 50
+
+    QuotationReferenceParam:
+      name: quotationReference
+      in: query
+      description: Filter by quotation reference
+      schema:
+        type: string
+        maxLength: 100
+
+    PONumberParam:
+      name: poNumber
+      in: query
+      description: Filter by PO number
+      schema:
+        type: string
+        maxLength: 100
+
+    InvoiceNumberParam:
+      name: invoiceNumber
+      in: query
+      description: Filter by invoice number (exact match)
+      schema:
+        type: string
+        maxLength: 50
+        example: INV-2025-00001
+
+    StatusParam:
+      name: status
+      in: query
+      description: Filter by invoice status
+      schema:
+        type: string
+        enum: [Draft, Finalized, Cancelled, PartiallyPaid, FullyPaid]
+
+    CurrencyParam:
+      name: currency
+      in: query
+      description: Filter by currency code (ISO 4217)
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 3
+        example: THB
+
+    IssueDateFromParam:
+      name: issueDateFrom
+      in: query
+      description: Filter by issue date (from)
+      schema:
+        type: string
+        format: date
+        example: '2025-01-01'
+
+    IssueDateToParam:
+      name: issueDateTo
+      in: query
+      description: Filter by issue date (to)
+      schema:
+        type: string
+        format: date
+        example: '2025-12-31'
+
+    DueDateFromParam:
+      name: dueDateFrom
+      in: query
+      description: Filter by due date (from)
+      schema:
+        type: string
+        format: date
+
+    DueDateToParam:
+      name: dueDateTo
+      in: query
+      description: Filter by due date (to)
+      schema:
+        type: string
+        format: date
+
+    IncludeCancelledParam:
+      name: includeCancelled
+      in: query
+      description: Include cancelled invoices in results
+      schema:
+        type: boolean
+        default: false
+
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Sort field
+      schema:
+        type: string
+        enum: [invoiceNumber, issueDate, dueDate, grandTotal]
+        default: invoiceNumber
+
+  schemas:
+    # ========================================
+    # Invoice Schemas
+    # ========================================
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - customerId
+        - customerName
+        - customerTaxId
+        - billingAddress
+        - currency
+        - issueDate
+        - dueDate
+        - lines
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: External customer ID
+        customerName:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Customer legal name
+        customerTaxId:
+          type: string
+          pattern: '^\d{13}$'
+          description: Thai tax ID (13 digits)
+          example: '1234567890123'
+        billingAddress:
+          type: string
+          minLength: 10
+          maxLength: 2000
+          description: Full billing address
+        shippingAddress:
+          type: string
+          maxLength: 2000
+          description: Optional shipping address
+        quotationReference:
+          type: string
+          maxLength: 100
+          description: Reference to quotation system
+        poNumber:
+          type: string
+          maxLength: 100
+          description: Customer purchase order number
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+          example: THB
+        issueDate:
+          type: string
+          format: date
+          description: Invoice issue date
+        dueDate:
+          type: string
+          format: date
+          description: Payment due date
+        paymentTermsDays:
+          type: integer
+          minimum: 0
+          maximum: 365
+          default: 30
+          description: Payment terms in days
+        lateFeePercentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+          description: Late payment fee percentage
+        lines:
+          type: array
+          minItems: 1
+          description: Invoice line items
+          items:
+            $ref: '#/components/schemas/InvoiceLineItemRequest'
+
+    UpdateInvoiceRequest:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/CreateInvoiceRequest'
+        - type: object
+          required:
+            - rowVersion
+          properties:
+            rowVersion:
+              type: string
+              format: byte
+              description: Base64-encoded row version for optimistic concurrency
+
+    InvoiceLineItemRequest:
+      type: object
+      required:
+        - lineNumber
+        - description
+        - quantity
+        - unitPrice
+        - taxCategory
+        - taxRate
+      properties:
+        lineNumber:
+          type: integer
+          minimum: 1
+          description: Line item sequence number
+        itemCode:
+          type: string
+          maxLength: 100
+          description: Product/service code
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Line item description
+        quantity:
+          type: number
+          format: decimal
+          minimum: 0.0001
+          description: Quantity (supports fractional values)
+          example: 10.5
+        unitPrice:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Price per unit
+          example: 1500.00
+        discountPercentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Discount percentage
+        taxCategory:
+          type: string
+          enum: [VAT, Exempt, ZeroRated]
+          default: VAT
+          description: Tax category
+        taxRate:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+          default: 7.00
+          description: Tax rate percentage
+
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+          nullable: true
+          example: INV-2025-00001
+        parentInvoiceId:
+          type: string
+          format: uuid
+          nullable: true
+        customerId:
+          type: string
+          format: uuid
+        customerName:
+          type: string
+        customerTaxId:
+          type: string
+        billingAddress:
+          type: string
+        shippingAddress:
+          type: string
+          nullable: true
+        quotationReference:
+          type: string
+          nullable: true
+        poNumber:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [Draft, Finalized, Cancelled, PartiallyPaid, FullyPaid]
+        currency:
+          type: string
+          example: THB
+        exchangeRate:
+          type: number
+          format: decimal
+          nullable: true
+        exchangeRateSource:
+          type: string
+          nullable: true
+        subtotal:
+          type: number
+          format: decimal
+          description: Sum of line subtotals
+        taxAmount:
+          type: number
+          format: decimal
+          description: Total tax amount
+        withholdingTaxAmount:
+          type: number
+          format: decimal
+          description: Withholding tax amount
+        grandTotal:
+          type: number
+          format: decimal
+          description: Final invoice total
+        issueDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        paymentTermsDays:
+          type: integer
+        lateFeePercentage:
+          type: number
+          format: decimal
+          nullable: true
+        finalizedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finalizedBy:
+          type: string
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledBy:
+          type: string
+          nullable: true
+        cancellationReason:
+          type: string
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineResponse'
+        rowVersion:
+          type: string
+          format: byte
+          description: Base64-encoded row version
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    InvoiceLineResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lineNumber:
+          type: integer
+        itemCode:
+          type: string
+          nullable: true
+        description:
+          type: string
+        quantity:
+          type: number
+          format: decimal
+        unitPrice:
+          type: number
+          format: decimal
+        discountPercentage:
+          type: number
+          format: decimal
+        taxCategory:
+          type: string
+        taxRate:
+          type: number
+          format: decimal
+        lineSubtotal:
+          type: number
+          format: decimal
+          description: Calculated line subtotal after discount
+        taxAmount:
+          type: number
+          format: decimal
+          description: Calculated tax amount
+        lineTotal:
+          type: number
+          format: decimal
+          description: Calculated line total (subtotal + tax)
+
+    SplitInvoiceRequest:
+      type: object
+      required:
+        - splits
+      properties:
+        splits:
+          type: array
+          minItems: 2
+          description: Split percentages or amounts
+          items:
+            type: object
+            required:
+              - percentage
+            properties:
+              percentage:
+                type: number
+                format: decimal
+                minimum: 0.01
+                maximum: 100
+                description: Percentage of parent invoice (must sum to 100)
+                example: 40.0
+              description:
+                type: string
+                maxLength: 500
+                description: Optional description for this split
+
+    PaginatedInvoiceResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceResponse'
+        totalCount:
+          type: integer
+          description: Total number of matching invoices
+        page:
+          type: integer
+          description: Current page number (0-indexed)
+        pageSize:
+          type: integer
+          description: Number of items per page
+        totalPages:
+          type: integer
+          description: Total number of pages
+
+    # ========================================
+    # Payment Schemas
+    # ========================================
+
+    CreatePaymentRequest:
+      type: object
+      required:
+        - paymentAmount
+        - paymentDate
+        - paymentMethod
+        - allocations
+      properties:
+        paymentAmount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          description: Total payment amount received
+          example: 50000.00
+        paymentDate:
+          type: string
+          format: date
+          description: Date payment was received
+        paymentMethod:
+          type: string
+          enum: [BankTransfer, Check, CreditCard, Cash]
+          description: Payment method
+        referenceNumber:
+          type: string
+          maxLength: 200
+          description: Bank reference or check number
+        notes:
+          type: string
+          maxLength: 2000
+          description: Additional payment notes
+        allocations:
+          type: array
+          minItems: 1
+          description: Invoice payment allocations
+          items:
+            type: object
+            required:
+              - invoiceId
+              - amount
+            properties:
+              invoiceId:
+                type: string
+                format: uuid
+                description: Invoice to allocate payment to
+              amount:
+                type: number
+                format: decimal
+                minimum: 0.01
+                description: Amount to allocate to this invoice
+
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        paymentAmount:
+          type: number
+          format: decimal
+        paymentDate:
+          type: string
+          format: date
+        paymentMethod:
+          type: string
+        referenceNumber:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        recordedBy:
+          type: string
+        allocations:
+          type: array
+          items:
+            type: object
+            properties:
+              invoiceId:
+                type: string
+                format: uuid
+              invoiceNumber:
+                type: string
+              allocatedAmount:
+                type: number
+                format: decimal
+        createdAt:
+          type: string
+          format: date-time
+
+    PaginatedPaymentResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentResponse'
+        totalCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalPages:
+          type: integer
+
+    # ========================================
+    # Audit Schemas
+    # ========================================
+
+    AuditLogResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          enum: [Created, Updated, Finalized, Cancelled, PaymentLinked, Split]
+        timestamp:
+          type: string
+          format: date-time
+        actorId:
+          type: string
+          description: User ID or system identifier
+        changedFields:
+          type: object
+          nullable: true
+          description: JSON object of changed fields (for Update events)
+        reason:
+          type: string
+          nullable: true
+          description: Reason for action (e.g., cancellation reason)
+
+    # ========================================
+    # Error Schemas
+    # ========================================
+
+    ErrorResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Error type URI
+          example: https://tools.ietf.org/html/rfc7231#section-6.5.1
+        title:
+          type: string
+          description: Short error description
+          example: Bad Request
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        detail:
+          type: string
+          description: Detailed error message
+          example: Customer Tax ID must be 13 digits
+        instance:
+          type: string
+          description: Request URI
+          example: /invoices/v1/invoices
+        traceId:
+          type: string
+          description: Correlation ID for tracing
+          example: 0HN7CVQR3QVJT:00000001
+        errors:
+          type: object
+          nullable: true
+          description: Validation errors grouped by field
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+  responses:
+    BadRequest:
+      description: Bad request (validation error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized (missing or invalid JWT token)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden (insufficient permissions)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Conflict (optimistic concurrency or business rule violation)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

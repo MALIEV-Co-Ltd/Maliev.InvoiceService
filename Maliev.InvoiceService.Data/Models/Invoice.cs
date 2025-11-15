@@ -1,203 +1,177 @@
-#nullable enable
-using System;
-using System.Collections.Generic;
+namespace Maliev.InvoiceService.Data.Models;
 
-namespace Maliev.InvoiceService.Data.Models
+/// <summary>
+/// Primary entity representing a billing document issued to a customer.
+/// Supports invoice creation from quotations, manual entry, splitting, and payment tracking.
+/// </summary>
+public class Invoice
 {
     /// <summary>
-    /// Represents an invoice.
+    /// Primary key
     /// </summary>
-    public partial class Invoice
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Invoice"/> class.
-        /// </summary>
-        public Invoice()
-        {
-            InvoiceFiles = new HashSet<InvoiceFile>();
-            OrderItems = new HashSet<OrderItem>();
-        }
+    public Guid Id { get; set; }
 
-        /// <summary>
-        /// Gets or sets the unique identifier of the invoice.
-        /// </summary>
-        public int Id { get; set; }
-        /// <summary>
-        /// Gets or sets the invoice number.
-        /// </summary>
-        public required string Number { get; set; }
-        /// <summary>
-        /// Gets or sets the customer identifier.
-        /// </summary>
-        public int CustomerId { get; set; }
-        /// <summary>
-        /// Gets or sets the comment.
-        /// </summary>
-        public string? Comment { get; set; }
-        /// <summary>
-        /// Gets or sets the internal comment.
-        /// </summary>
-        public string? InternalComment { get; set; }
-        /// <summary>
-        /// Gets or sets the sales person.
-        /// </summary>
-        public string? SalesPerson { get; set; }
-        /// <summary>
-        /// Gets or sets the currency.
-        /// </summary>
-        public string? Currency { get; set; }
-        /// <summary>
-        /// Gets or sets the purchase order number.
-        /// </summary>
-        public string? PurchaseOrderNumber { get; set; }
-        /// <summary>
-        /// Gets or sets the requisitioner.
-        /// </summary>
-        public string? Requisitioner { get; set; }
-        /// <summary>
-        /// Gets or sets the shipped via.
-        /// </summary>
-        public string? ShippedVia { get; set; }
-        /// <summary>
-        /// Gets or sets the FOB (Free On Board) terms.
-        /// </summary>
-        public string? Fob { get; set; }
-        /// <summary>
-        /// Gets or sets the payment terms.
-        /// </summary>
-        public string? Terms { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address recipient.
-        /// </summary>
-        public string? BillingAddressRecipient { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address company.
-        /// </summary>
-        public string? BillingAddressCompany { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address building.
-        /// </summary>
-        public string? BillingAddressBuilding { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address line 1.
-        /// </summary>
-        public string? BillingAddressLine1 { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address line 2.
-        /// </summary>
-        public string? BillingAddressLine2 { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address city.
-        /// </summary>
-        public string? BillingAddressCity { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address state.
-        /// </summary>
-        public string? BillingAddressState { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address postal code.
-        /// </summary>
-        public string? BillingAddressPostalCode { get; set; }
-        /// <summary>
-        /// Gets or sets the billing address country.
-        /// </summary>
-        public string? BillingAddressCountry { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address recipient.
-        /// </summary>
-        public string? ShippingAddressRecipient { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address recipient telephone.
-        /// </summary>
-        public string? ShippingAddressRecipientTelephone { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address company.
-        /// </summary>
-        public string? ShippingAddressCompany { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address building.
-        /// </summary>
-        public string? ShippingAddressBuilding { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address line 1.
-        /// </summary>
-        public string? ShippingAddressLine1 { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address line 2.
-        /// </summary>
-        public string? ShippingAddressLine2 { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address city.
-        /// </summary>
-        public string? ShippingAddressCity { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address state.
-        /// </summary>
-        public string? ShippingAddressState { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address postal code.
-        /// </summary>
-        public string? ShippingAddressPostalCode { get; set; }
-        /// <summary>
-        /// Gets or sets the shipping address country.
-        /// </summary>
-        public string? ShippingAddressCountry { get; set; }
-        /// <summary>
-        /// Gets or sets the commercial registration.
-        /// </summary>
-        public string? CommercialRegistration { get; set; }
-        /// <summary>
-        /// Gets or sets the tax identification.
-        /// </summary>
-        public string? TaxIdentification { get; set; }
-        /// <summary>
-        /// Gets or sets the subtotal of the invoice.
-        /// </summary>
-        public decimal? Subtotal { get; set; }
-        /// <summary>
-        /// Gets or sets the VAT (Value Added Tax) amount.
-        /// </summary>
-        public decimal? Vat { get; set; }
-        /// <summary>
-        /// Gets or sets the total amount of the invoice.
-        /// </summary>
-        public decimal? Total { get; set; }
-        /// <summary>
-        /// Gets or sets the withholding tax amount.
-        /// </summary>
-        public decimal? WithholdingTax { get; set; }
-        /// <summary>
-        /// Gets or sets the outstanding amount.
-        /// </summary>
-        public decimal? Outstanding { get; set; }
-        /// <summary>
-        /// Gets or sets a value indicating whether the invoice is paid.
-        /// </summary>
-        public bool IsPaid { get; set; }
-        /// <summary>
-        /// Gets or sets the receipt identifier.
-        /// </summary>
-        public int? ReceiptId { get; set; }
-        /// <summary>
-        /// Gets or sets the payment date.
-        /// </summary>
-        public DateTime? PaymentDate { get; set; }
-        /// <summary>
-        /// Gets or sets the creation date of the invoice.
-        /// </summary>
-        public DateTime? CreatedDate { get; set; }
-        /// <summary>
-        /// Gets or sets the last modification date of the invoice.
-        /// </summary>
-        public DateTime? ModifiedDate { get; set; }
+    /// <summary>
+    /// Unique invoice number (e.g., INV-2025-00001), assigned on finalization
+    /// </summary>
+    public string? InvoiceNumber { get; set; }
 
-        /// <summary>
-        /// Gets or sets the collection of invoice files associated with this invoice.
-        /// </summary>
-        public virtual ICollection<InvoiceFile> InvoiceFiles { get; set; }
-        /// <summary>
-        /// Gets or sets the collection of order items associated with this invoice.
-        /// </summary>
-        public virtual ICollection<OrderItem> OrderItems { get; set; }
-    }
+    /// <summary>
+    /// Foreign key to parent invoice (for split invoices)
+    /// </summary>
+    public Guid? ParentInvoiceId { get; set; }
+
+    /// <summary>
+    /// External customer ID
+    /// </summary>
+    public Guid CustomerId { get; set; }
+
+    /// <summary>
+    /// Customer legal name
+    /// </summary>
+    public string CustomerName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Customer tax identification number
+    /// </summary>
+    public string CustomerTaxId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Full billing address
+    /// </summary>
+    public string BillingAddress { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional shipping address
+    /// </summary>
+    public string? ShippingAddress { get; set; }
+
+    /// <summary>
+    /// Reference to quotation system
+    /// </summary>
+    public string? QuotationReference { get; set; }
+
+    /// <summary>
+    /// Customer purchase order number
+    /// </summary>
+    public string? PoNumber { get; set; }
+
+    /// <summary>
+    /// Invoice status (Draft, Finalized, Cancelled, PartiallyPaid, FullyPaid)
+    /// </summary>
+    public string Status { get; set; } = "Draft";
+
+    /// <summary>
+    /// ISO 4217 currency code
+    /// </summary>
+    public string Currency { get; set; } = "THB";
+
+    /// <summary>
+    /// Exchange rate at creation time (if multi-currency)
+    /// </summary>
+    public decimal? ExchangeRate { get; set; }
+
+    /// <summary>
+    /// Source of exchange rate (CurrencyService, Manual, Fallback)
+    /// </summary>
+    public string? ExchangeRateSource { get; set; }
+
+    /// <summary>
+    /// Sum of all line subtotals before tax
+    /// </summary>
+    public decimal Subtotal { get; set; }
+
+    /// <summary>
+    /// Total VAT/tax amount
+    /// </summary>
+    public decimal TaxAmount { get; set; }
+
+    /// <summary>
+    /// Withholding tax amount
+    /// </summary>
+    public decimal WithholdingTaxAmount { get; set; }
+
+    /// <summary>
+    /// Final invoice total (subtotal + tax - withholding)
+    /// </summary>
+    public decimal GrandTotal { get; set; }
+
+    /// <summary>
+    /// Date invoice was issued
+    /// </summary>
+    public DateTime IssueDate { get; set; }
+
+    /// <summary>
+    /// Payment due date
+    /// </summary>
+    public DateTime DueDate { get; set; }
+
+    /// <summary>
+    /// Number of days for payment (e.g., 30, 60, 90)
+    /// </summary>
+    public int PaymentTermsDays { get; set; } = 30;
+
+    /// <summary>
+    /// Late payment fee percentage
+    /// </summary>
+    public decimal? LateFeePercentage { get; set; }
+
+    /// <summary>
+    /// Timestamp when invoice was finalized
+    /// </summary>
+    public DateTime? FinalizedAt { get; set; }
+
+    /// <summary>
+    /// User ID who finalized the invoice
+    /// </summary>
+    public string? FinalizedBy { get; set; }
+
+    /// <summary>
+    /// Timestamp when invoice was cancelled
+    /// </summary>
+    public DateTime? CancelledAt { get; set; }
+
+    /// <summary>
+    /// User ID who cancelled the invoice
+    /// </summary>
+    public string? CancelledBy { get; set; }
+
+    /// <summary>
+    /// Reason for cancellation
+    /// </summary>
+    public string? CancellationReason { get; set; }
+
+    /// <summary>
+    /// File reference (URL or ID) to PDF document generated by PDF Service.
+    /// Registered via Upload Service callback after PDF generation.
+    /// </summary>
+    public string? PdfFileReference { get; set; }
+
+    /// <summary>
+    /// Soft delete flag
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// Optimistic concurrency token (must be manually incremented for PostgreSQL)
+    /// </summary>
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
+    /// <summary>
+    /// Record creation timestamp
+    /// </summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// Record last update timestamp
+    /// </summary>
+    public DateTime UpdatedAt { get; set; }
+
+    // Navigation properties
+    public Invoice? ParentInvoice { get; set; }
+    public ICollection<Invoice> ChildInvoices { get; set; } = new List<Invoice>();
+    public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
+    public ICollection<InvoicePaymentAllocation> InvoicePaymentAllocations { get; set; } = new List<InvoicePaymentAllocation>();
+    public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+    public ICollection<FileReference> FileReferences { get; set; } = new List<FileReference>();
 }
