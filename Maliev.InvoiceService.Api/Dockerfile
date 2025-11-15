@@ -19,8 +19,7 @@ COPY . .
 
 # Build and publish
 WORKDIR /src/Maliev.InvoiceService.Api
-RUN dotnet build -c Release -o /app/build --no-restore
-RUN dotnet publish -c Release -o /app/publish --no-restore --no-build /p:UseAppHost=false
+RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
