@@ -74,7 +74,7 @@ try
     builder.Services.AddMemoryCache();
 
     // Redis Distributed Cache with fallback to in-memory
-    var redisConfiguration = builder.Configuration.GetSection("Redis:Configuration").Value;
+    var redisConfiguration = builder.Configuration.GetSection("Redis:ConnectionString").Value;
     if (!string.IsNullOrEmpty(redisConfiguration))
     {
         builder.Services.AddStackExchangeRedisCache(options =>
