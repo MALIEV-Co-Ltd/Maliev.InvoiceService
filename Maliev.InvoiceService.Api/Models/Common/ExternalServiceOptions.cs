@@ -13,7 +13,7 @@ public class ExternalServiceOptions
     /// <summary>
     /// Gets or sets the timeout in seconds for HTTP requests.
     /// </summary>
-    public int TimeoutSeconds { get; set; } = 5;
+    public int TimeoutInSeconds { get; set; } = 180;
 
     /// <summary>
     /// Gets or sets the maximum number of retry attempts for failed requests.

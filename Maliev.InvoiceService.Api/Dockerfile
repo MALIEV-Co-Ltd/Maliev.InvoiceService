@@ -25,17 +25,14 @@ RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Copy published application
-COPY --from=build /app/publish .
-
-# Create directory for Google Secret Manager secrets
-RUN mkdir -p /mnt/secrets && chown -R appuser:appuser /mnt/secrets
+# Create directory for Google Secret Manager secrets and ensure 'app' owns the workdir (app user already exists in ASP.NET runtime image)
+RUN mkdir -p /mnt/secrets && chown -R app:app /app /mnt/secrets
 
 # Switch to non-root user
-USER appuser
+USER app
+
+# Copy published application (now owned by app)
+COPY --from=build /app/publish .
 
 # Expose port
 EXPOSE 8080

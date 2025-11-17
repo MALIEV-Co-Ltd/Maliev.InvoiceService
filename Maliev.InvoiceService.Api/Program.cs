@@ -108,7 +108,7 @@ try
     {
         var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<CurrencyServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
     })
     .AddStandardResilienceHandler(options =>
     {
@@ -123,7 +123,7 @@ try
     {
         var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<QuotationServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
     })
     .AddStandardResilienceHandler(options =>
     {
@@ -140,7 +140,7 @@ try
     {
         var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<PaymentServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        client.Timeout = TimeSpan.FromSeconds(options.TimeoutInSeconds);
     })
     .AddStandardResilienceHandler(options =>
     {
