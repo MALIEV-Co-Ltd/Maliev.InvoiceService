@@ -11,7 +11,7 @@ Create a comprehensive Invoice Management Service that serves as the single sour
 
 ## Technical Context
 
-**Language/Version**: C# with .NET 9.0 SDK and ASP.NET Core 9.0
+**Language/Version**: C# with .NET 10.0 SDK and ASP.NET Core 9.0
 **Primary Dependencies**:
 - Entity Framework Core 9.0.10 with Npgsql 9.0.4
 - Serilog 8.0.2 for structured logging
