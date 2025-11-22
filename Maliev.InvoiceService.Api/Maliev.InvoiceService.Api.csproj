@@ -21,7 +21,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="1.2.42" />
@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Maliev.InvoiceService.Data\Maliev.InvoiceService.Data.csproj" />
+    <PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.*" />
   </ItemGroup>
 
 </Project>

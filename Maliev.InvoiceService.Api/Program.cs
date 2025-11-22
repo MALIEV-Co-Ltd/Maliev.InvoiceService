@@ -317,6 +317,9 @@ try
     // Force metrics initialization
     RuntimeHelpers.RunClassConstructor(typeof(Maliev.InvoiceService.Api.Services.InvoiceMetrics).TypeHandle);
 
+    // Add service defaults for .NET Aspire
+    builder.AddServiceDefaults();
+
     var app = builder.Build();
 
     // EXACT middleware pipeline order per CLAUDE.md
