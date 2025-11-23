@@ -15,7 +15,7 @@ COPY Maliev.InvoiceService.Tests/Maliev.InvoiceService.Tests.csproj Maliev.Invoi
 
 # Restore with GitHub Packages authentication using BuildKit secrets
 RUN --mount=type=secret,id=nuget_username \
-  --mount=type=secret,id=n uget_password \
+  --mount=type=secret,id=nuget_password \
   NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
   NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
   dotnet restore Maliev.InvoiceService.sln
