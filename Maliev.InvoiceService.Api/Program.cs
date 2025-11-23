@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using Prometheus;
 using Scalar.AspNetCore;
 using Serilog;
@@ -225,25 +224,8 @@ try
         options.ApiVersionReader = new UrlSegmentApiVersionReader();
     });
 
-    // OpenAPI with Swashbuckle and Scalar
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(options =>
-    {
-        options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-        {
-            Title = "Invoice Management Service API",
-            Description = "API for managing invoices, payments, and audit trails",
-            Version = "v1"
-        });
-
-        // Include XML comments
-        var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
-        if (File.Exists(xmlPath))
-        {
-            options.IncludeXmlComments(xmlPath);
-        }
-    });
+    // OpenAPI
+    builder.Services.AddOpenApi();
 
     // JWT Authentication
     if (!builder.Environment.IsEnvironment("Testing"))
@@ -338,22 +320,25 @@ try
         app.UseAuthorization();
     }
 
-    // Swagger and Scalar (development only) - mapped after middleware pipeline
+    // OpenAPI and Scalar (development only) - mapped after middleware pipeline
     if (app.Environment.IsDevelopment())
     {
-        app.UseSwagger(c =>
-        {
-            c.RouteTemplate = "invoices/swagger/{documentName}/swagger.json";
-        });
-        app.MapScalarApiReference(options =>
+        // Map OpenAPI at /invoices/openapi/v1.json
+        app.MapOpenApi("/invoices/openapi/{documentName}.json");
+
+        // Map Scalar at /invoices/scalar/v1 path (matches ingress /invoices prefix)
+        app.MapScalarApiReference("/invoices/scalar/v1", options =>
         {
             options
-                .WithTitle("Invoice Management Service API")
+                .WithTitle("MALIEV Invoice Service API")
                 .WithTheme(ScalarTheme.Default)
                 .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
-                .WithEndpointPrefix("/invoices/scalar/{documentName}")
-                .WithOpenApiRoutePattern("/invoices/swagger/{documentName}/swagger.json");
+                .WithOpenApiRoutePattern("/invoices/openapi/v1.json");
         });
+
+        // Redirect root to Scalar
+        app.MapGet("/", () => Results.Redirect("/invoices/scalar/v1")).ExcludeFromDescription();
+        app.MapGet("/invoices", () => Results.Redirect("/invoices/scalar/v1")).ExcludeFromDescription();
     }
 
     // Health Checks

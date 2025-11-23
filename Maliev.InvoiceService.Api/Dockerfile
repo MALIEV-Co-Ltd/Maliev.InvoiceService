@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # Multi-stage Docker build for Maliev.InvoiceService.Api
 # Based on MALIEV Co. Ltd. standard .NET 10 microservice template
 
@@ -5,14 +6,19 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
+# Copy nuget.config and project files
+COPY nuget.config ./
 COPY Maliev.InvoiceService.sln ./
 COPY Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj Maliev.InvoiceService.Api/
 COPY Maliev.InvoiceService.Data/Maliev.InvoiceService.Data.csproj Maliev.InvoiceService.Data/
 COPY Maliev.InvoiceService.Tests/Maliev.InvoiceService.Tests.csproj Maliev.InvoiceService.Tests/
 
-# Restore dependencies
-RUN dotnet restore Maliev.InvoiceService.sln
+# Restore with GitHub Packages authentication using BuildKit secrets
+RUN --mount=type=secret,id=nuget_username \
+  --mount=type=secret,id=n uget_password \
+  NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+  NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+  dotnet restore Maliev.InvoiceService.sln
 
 # Copy all source code
 COPY . .
