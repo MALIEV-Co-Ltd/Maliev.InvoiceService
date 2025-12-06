@@ -125,7 +125,7 @@ public class AuditLogInterceptor : SaveChangesInterceptor
                     }
                     else
                     {
-                        auditLog.ChangedFields = CaptureChangedFields(entry);
+                        auditLog.ChangedFields = CaptureChangedFields(entry) ?? "{}";
                     }
                 }
                 else
@@ -138,7 +138,7 @@ public class AuditLogInterceptor : SaveChangesInterceptor
         }
     }
 
-    private string CaptureChangedFields(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<Invoice> entry)
+    private string? CaptureChangedFields(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<Invoice> entry)
     {
         var changes = new Dictionary<string, string>();
 
@@ -158,6 +158,6 @@ public class AuditLogInterceptor : SaveChangesInterceptor
             }
         }
 
-        return changes.Count > 0 ? JsonSerializer.Serialize(changes) : null!;
+        return changes.Count > 0 ? JsonSerializer.Serialize(changes) : null;
     }
 }

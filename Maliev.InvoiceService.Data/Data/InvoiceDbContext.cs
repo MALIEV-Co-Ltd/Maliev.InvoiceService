@@ -26,11 +26,8 @@ public class InvoiceDbContext : DbContext
     {
         base.OnConfiguring(optionsBuilder);
 
-        // Only add interceptors if not already configured (i.e., not in tests)
-        if (!optionsBuilder.IsConfigured)
-        {
-            optionsBuilder.AddInterceptors(new AuditLogInterceptor());
-        }
+        // Always add audit log interceptor for all environments (including tests)
+        optionsBuilder.AddInterceptors(new AuditLogInterceptor());
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

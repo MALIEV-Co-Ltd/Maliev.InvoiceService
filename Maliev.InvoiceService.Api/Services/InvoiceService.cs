@@ -738,7 +738,7 @@ public class InvoiceService : IInvoiceService
                 Id = Guid.NewGuid(),
                 InvoiceId = invoiceCheck.Id,
                 EventType = "UpdateAttemptRejected",
-                ChangedFields = $"Attempted to modify {invoiceCheck.Status} invoice",
+                ChangedFields = JsonSerializer.Serialize(new { message = $"Attempted to modify {invoiceCheck.Status} invoice" }),
                 ActorId = "System",
                 Timestamp = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow

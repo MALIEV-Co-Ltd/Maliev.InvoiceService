@@ -1,48 +1,40 @@
-using Prometheus;
+using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 
 namespace Maliev.InvoiceService.Api.Services;
 
 /// <summary>
-/// Prometheus metrics for monitoring invoice operations and business analytics.
-/// Metrics are exposed at /invoices/metrics endpoint for scraping by Prometheus.
+/// OpenTelemetry metrics for monitoring invoice operations and business analytics.
+/// Instruments are created with System.Diagnostics.Metrics (compatible with OpenTelemetry).
 /// </summary>
 public static class InvoiceMetrics
 {
-    private static readonly Counter InvoicesCreatedTotal = Metrics.CreateCounter(
+    private static readonly Meter _meter = new("Maliev.InvoiceService.Metrics", "1.0.0");
+
+    private static readonly Counter<long> InvoicesCreatedTotal = _meter.CreateCounter<long>(
         "invoices_created_total",
-        "Total number of invoices created",
-        new CounterConfiguration
-        {
-            LabelNames = new[] { "status" }
-        });
+        description: "Total number of invoices created");
 
-    private static readonly Counter InvoicesFinalizedTotal = Metrics.CreateCounter(
+    private static readonly Counter<long> InvoicesFinalizedTotal = _meter.CreateCounter<long>(
         "invoices_finalized_total",
-        "Total number of invoices finalized");
+        description: "Total number of invoices finalized");
 
-    private static readonly Counter InvoiceSplitOperationsTotal = Metrics.CreateCounter(
+    private static readonly Counter<long> InvoiceSplitOperationsTotal = _meter.CreateCounter<long>(
         "invoice_split_operations_total",
-        "Total number of invoice split operations",
-        new CounterConfiguration
-        {
-            LabelNames = new[] { "result" }
-        });
+        description: "Total number of invoice split operations");
 
-    private static readonly Gauge InvoicesActiveCount = Metrics.CreateGauge(
+    // Store per-status active invoice counts so the observable gauge can report per-status values.
+    private static readonly ConcurrentDictionary<string, long> _invoicesActiveCounts = new();
+
+    private static readonly ObservableGauge<long> InvoicesActiveCount = _meter.CreateObservableGauge<long>(
         "invoices_active_count",
-        "Current number of active (non-cancelled, non-deleted) invoices",
-        new GaugeConfiguration
-        {
-            LabelNames = new[] { "status" }
-        });
+        ObserveActiveCounts,
+        description: "Current number of active (non-cancelled, non-deleted) invoices");
 
-    private static readonly Histogram InvoiceAmountThb = Metrics.CreateHistogram(
+    private static readonly Histogram<double> InvoiceAmountThb = _meter.CreateHistogram<double>(
         "invoice_amount_thb",
-        "Distribution of invoice amounts in THB",
-        new HistogramConfiguration
-        {
-            Buckets = new[] { 1000.0, 5000.0, 10000.0, 25000.0, 50000.0, 100000.0, 250000.0, 500000.0, 1000000.0 }
-        });
+        unit: "THB",
+        description: "Distribution of invoice amounts in THB");
 
     /// <summary>
     /// Records the creation of an invoice with its initial status.
@@ -50,7 +42,9 @@ public static class InvoiceMetrics
     /// <param name="status">Invoice status (e.g., "Draft", "Finalized").</param>
     public static void RecordInvoiceCreated(string status)
     {
-        InvoicesCreatedTotal.WithLabels(status).Inc();
+        InvoicesCreatedTotal.Add(
+            1,
+            new[] { new KeyValuePair<string, object?>("status", status) });
     }
 
     /// <summary>
@@ -58,7 +52,7 @@ public static class InvoiceMetrics
     /// </summary>
     public static void RecordInvoiceFinalized()
     {
-        InvoicesFinalizedTotal.Inc();
+        InvoicesFinalizedTotal.Add(1);
     }
 
     /// <summary>
@@ -67,7 +61,9 @@ public static class InvoiceMetrics
     /// <param name="success">True if split was successful, false otherwise.</param>
     public static void RecordInvoiceSplitOperation(bool success)
     {
-        InvoiceSplitOperationsTotal.WithLabels(success ? "success" : "failure").Inc();
+        InvoiceSplitOperationsTotal.Add(
+            1,
+            new[] { new KeyValuePair<string, object?>("result", success ? "success" : "failure") });
     }
 
     /// <summary>
@@ -77,7 +73,7 @@ public static class InvoiceMetrics
     /// <param name="count">Current count of invoices with this status.</param>
     public static void SetActiveInvoiceCount(string status, int count)
     {
-        InvoicesActiveCount.WithLabels(status).Set(count);
+        _invoicesActiveCounts.AddOrUpdate(status, count, (_, __) => count);
     }
 
     /// <summary>
@@ -86,6 +82,17 @@ public static class InvoiceMetrics
     /// <param name="amountThb">Invoice total amount in Thai Baht.</param>
     public static void RecordInvoiceAmount(decimal amountThb)
     {
-        InvoiceAmountThb.Observe((double)amountThb);
+        InvoiceAmountThb.Record((double)amountThb);
+    }
+
+    private static IEnumerable<Measurement<long>> ObserveActiveCounts()
+    {
+        // Produce one Measurement per status, each tagged with the status label.
+        foreach (var kvp in _invoicesActiveCounts.ToArray())
+        {
+            yield return new Measurement<long>(
+                kvp.Value,
+                new[] { new KeyValuePair<string, object?>("status", kvp.Key) });
+        }
     }
 }
