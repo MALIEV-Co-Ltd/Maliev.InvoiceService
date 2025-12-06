@@ -18,8 +18,17 @@ jobs:
         with:
           dotnet-version: "10.x"
 
+      - name: Switch to PackageReference for CI build
+        run: |
+          # Replace ProjectReference with PackageReference in all service csproj files
+          find . -name "*.csproj" -type f -exec sed -i 's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.*" />|g' {} \;
+          echo "Switched to PackageReference for ServiceDefaults"
+
       - name: Restore dependencies
         run: dotnet restore Maliev.InvoiceService.sln
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Build
         run: dotnet build Maliev.InvoiceService.sln --no-restore
@@ -38,14 +47,10 @@ jobs:
         with:
           project_id: maliev-website
 
-
       - name: Build and push Docker image
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev
-          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build \
-            --secret id=nuget_username,env=NUGET_USERNAME \
-            --secret id=nuget_password,env=NUGET_PASSWORD \
-            -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-invoice-service:${{ github.sha }} -f Maliev.InvoiceService.Api/Dockerfile .
+          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build --secret id=nuget_username,env=NUGET_USERNAME --secret id=nuget_password,env=NUGET_PASSWORD -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-invoice-service:${{ github.sha }} -f Maliev.InvoiceService.Api/Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-invoice-service:${{ github.sha }}
 
       - name: Checkout maliev-gitops repository
@@ -71,7 +76,7 @@ jobs:
           PR_BODY: |
             Automated deployment of invoice-service to production environment.
 
-            ⚠️ **PRODUCTION DEPLOYMENT** - Please review carefully before merging.
+            **PRODUCTION DEPLOYMENT** - Please review carefully before merging.
 
             Commit: ${{ github.sha }}
             Triggered by: ${{ github.actor }}
@@ -96,9 +101,4 @@ jobs:
           git push origin $BRANCH_NAME
 
           # Create pull request using GitHub CLI
-          gh pr create \
-            --title "Deploy invoice-service ${{ github.sha }} to production" \
-            --body "$PR_BODY" \
-            --base main \
-            --head $BRANCH_NAME \
-            --repo MALIEV-Co-Ltd/maliev-gitops
+          gh pr create             --title "Deploy invoice-service ${{ github.sha }} to production"             --body "$PR_BODY"             --base main             --head $BRANCH_NAME             --repo MALIEV-Co-Ltd/maliev-gitops
