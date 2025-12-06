@@ -8,7 +8,6 @@ WORKDIR /src
 
 # Copy nuget.config and project files
 COPY nuget.config ./
-COPY Maliev.InvoiceService.sln ./
 COPY Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj Maliev.InvoiceService.Api/
 COPY Maliev.InvoiceService.Data/Maliev.InvoiceService.Data.csproj Maliev.InvoiceService.Data/
 
@@ -17,7 +16,7 @@ RUN --mount=type=secret,id=nuget_username \
   --mount=type=secret,id=nuget_password \
   NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
   NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
-  dotnet restore Maliev.InvoiceService.sln
+  dotnet restore Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj
 
 # Copy all source code
 COPY . .
