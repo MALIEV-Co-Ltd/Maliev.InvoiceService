@@ -11,7 +11,6 @@ COPY nuget.config ./
 COPY Maliev.InvoiceService.sln ./
 COPY Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj Maliev.InvoiceService.Api/
 COPY Maliev.InvoiceService.Data/Maliev.InvoiceService.Data.csproj Maliev.InvoiceService.Data/
-COPY Maliev.InvoiceService.Tests/Maliev.InvoiceService.Tests.csproj Maliev.InvoiceService.Tests/
 
 # Restore with GitHub Packages authentication using BuildKit secrets
 RUN --mount=type=secret,id=nuget_username \

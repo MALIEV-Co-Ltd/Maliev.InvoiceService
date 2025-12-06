@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.InvoiceService.Api.Models.Invoices;
 
 /// <summary>
@@ -8,6 +10,8 @@ public class SplitInvoiceRequest
     /// <summary>
     /// Gets or sets the list of split rules defining how to divide the invoice.
     /// </summary>
+    [Required]
+    [MinLength(2)]
     public List<InvoiceSplitRule> SplitRules { get; set; } = new();
 }
 
@@ -19,10 +23,12 @@ public class InvoiceSplitRule
     /// <summary>
     /// Gets or sets the percentage of the original invoice to allocate to this child invoice.
     /// </summary>
+    [Range(0.01, 100.0)]
     public decimal Percentage { get; set; }
 
     /// <summary>
     /// Gets or sets optional notes for this split rule.
     /// </summary>
+    [StringLength(2000)]
     public string? Notes { get; set; }
 }

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.InvoiceService.Api.Models.Invoices;
 
 /// <summary>
@@ -8,5 +10,7 @@ public class FinalizeInvoiceRequest
     /// <summary>
     /// Gets or sets the identifier of the user finalizing the invoice.
     /// </summary>
+    [Required]
+    [StringLength(100)]
     public string FinalizedBy { get; set; } = string.Empty;
 }
