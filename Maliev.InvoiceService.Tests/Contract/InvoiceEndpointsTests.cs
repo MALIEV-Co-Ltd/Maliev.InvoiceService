@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
+using System.Text.RegularExpressions;
 
 namespace Maliev.InvoiceService.Tests.Contract;
 
@@ -68,15 +68,15 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-        response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.PathAndQuery.Should().Contain("/invoices/v1/invoices/");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+        Assert.Contains("/invoices/v1/invoices/", response.Headers.Location!.PathAndQuery);
 
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        invoice.Should().NotBeNull();
-        invoice!.Id.Should().NotBeEmpty();
-        invoice.QuotationReference.Should().Be("QT-2025-00001");
-        invoice.Status.Should().Be("Draft");
+        Assert.NotNull(invoice);
+        Assert.NotEqual(Guid.Empty, invoice!.Id);
+        Assert.Equal("QT-2025-00001", invoice.QuotationReference);
+        Assert.Equal("Draft", invoice.Status);
     }
 
     #endregion
@@ -110,15 +110,15 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", finalizeRequest);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var finalized = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        finalized.Should().NotBeNull();
-        finalized!.Status.Should().Be("Finalized");
-        finalized.InvoiceNumber.Should().NotBeNullOrEmpty();
-        finalized.InvoiceNumber.Should().MatchRegex(@"^INV-\d{8}-\d{6}$");
-        finalized.FinalizedAt.Should().NotBeNull();
-        finalized.FinalizedBy.Should().Be("test-user");
+        Assert.NotNull(finalized);
+        Assert.Equal("Finalized", finalized!.Status);
+        Assert.False(string.IsNullOrEmpty(finalized.InvoiceNumber));
+        Assert.Matches(@"^INV-\d{8}-\d{6}$", finalized.InvoiceNumber);
+        Assert.NotNull(finalized.FinalizedAt);
+        Assert.Equal("test-user", finalized.FinalizedBy);
     }
 
     #endregion
@@ -151,14 +151,15 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/invoices/{created!.Id}");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        invoice.Should().NotBeNull();
-        invoice!.Id.Should().Be(created.Id);
-        invoice.Lines.Should().NotBeNull().And.HaveCount(1);
-        invoice.Subtotal.Should().BeGreaterThan(0);
-        invoice.GrandTotal.Should().BeGreaterThan(0);
+        Assert.NotNull(invoice);
+        Assert.Equal(created.Id, invoice!.Id);
+        Assert.NotNull(invoice.Lines);
+        Assert.Single(invoice.Lines);
+        Assert.True(invoice.Subtotal > 0);
+        Assert.True(invoice.GrandTotal > 0);
     }
 
     [Fact]
@@ -168,7 +169,7 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/invoices/{Guid.NewGuid()}");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     #endregion
@@ -200,13 +201,13 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        invoice.Should().NotBeNull();
-        invoice!.QuotationReference.Should().BeNullOrEmpty();
-        invoice.WithholdingTaxAmount.Should().BeGreaterThan(0);
-        invoice.Currency.Should().Be("USD");
+        Assert.NotNull(invoice);
+        Assert.True(string.IsNullOrEmpty(invoice!.QuotationReference));
+        Assert.True(invoice.WithholdingTaxAmount > 0);
+        Assert.Equal("USD", invoice.Currency);
     }
 
     #endregion
@@ -248,12 +249,13 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/split", splitRequest);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var children = await response.Content.ReadFromJsonAsync<List<InvoiceResponse>>();
-        children.Should().NotBeNull().And.HaveCount(2);
-        children![0].ParentInvoiceId.Should().Be(draft.Id);
-        children![1].ParentInvoiceId.Should().Be(draft.Id);
+        Assert.NotNull(children);
+        Assert.Equal(2, children!.Count);
+        Assert.Equal(draft.Id, children[0].ParentInvoiceId);
+        Assert.Equal(draft.Id, children[1].ParentInvoiceId);
     }
 
     [Fact]
@@ -291,7 +293,7 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/split", splitRequest);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     #endregion
@@ -326,14 +328,15 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync("/invoices/v1/invoices?page=1&pageSize=2&status=Draft");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await response.Content.ReadFromJsonAsync<PaginatedResponse<InvoiceResponse>>();
-        result.Should().NotBeNull();
-        result!.Items.Should().NotBeNull().And.HaveCountLessThanOrEqualTo(2);
-        result.Page.Should().Be(1);
-        result.PageSize.Should().Be(2);
-        result.TotalCount.Should().BeGreaterThanOrEqualTo(3);
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Items);
+        Assert.True(result.Items.Count() <= 2);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(2, result.PageSize);
+        Assert.True(result.TotalCount >= 3);
     }
 
     #endregion
@@ -372,14 +375,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/cancel", cancelRequest);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var cancelled = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        cancelled.Should().NotBeNull();
-        cancelled!.Status.Should().Be("Cancelled");
-        cancelled.CancelledAt.Should().NotBeNull();
-        cancelled.CancelledBy.Should().Be("admin-user");
-        cancelled.CancellationReason.Should().Be("Customer requested cancellation");
+        Assert.NotNull(cancelled);
+        Assert.Equal("Cancelled", cancelled!.Status);
+        Assert.NotNull(cancelled.CancelledAt);
+        Assert.Equal("admin-user", cancelled.CancelledBy);
+        Assert.Equal("Customer requested cancellation", cancelled.CancellationReason);
     }
 
     #endregion
@@ -424,23 +427,24 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/invoices/{draft.Id}");
 
         // Assert - Contract verification for PDF generation
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        invoice.Should().NotBeNull();
+        Assert.NotNull(invoice);
 
         // PDF Required Fields per spec
-        invoice!.InvoiceNumber.Should().NotBeNullOrEmpty();
-        invoice.CustomerName.Should().NotBeNullOrEmpty();
-        invoice.CustomerTaxId.Should().NotBeNullOrEmpty();
-        invoice.BillingAddress.Should().NotBeNullOrEmpty();
-        invoice.IssueDate.Should().NotBe(default);
-        invoice.DueDate.Should().NotBe(default);
-        invoice.Lines.Should().NotBeNull().And.HaveCount(1);
-        invoice.Lines.First().Description.Should().NotBeNullOrEmpty();
-        invoice.Subtotal.Should().BeGreaterThan(0);
-        invoice.TaxAmount.Should().BeGreaterThan(0);
-        invoice.GrandTotal.Should().BeGreaterThan(0);
+        Assert.False(string.IsNullOrEmpty(invoice!.InvoiceNumber));
+        Assert.False(string.IsNullOrEmpty(invoice.CustomerName));
+        Assert.False(string.IsNullOrEmpty(invoice.CustomerTaxId));
+        Assert.False(string.IsNullOrEmpty(invoice.BillingAddress));
+        Assert.NotEqual(default, invoice.IssueDate);
+        Assert.NotEqual(default, invoice.DueDate);
+        Assert.NotNull(invoice.Lines);
+        Assert.Single(invoice.Lines);
+        Assert.False(string.IsNullOrEmpty(invoice.Lines.First().Description));
+        Assert.True(invoice.Subtotal > 0);
+        Assert.True(invoice.TaxAmount > 0);
+        Assert.True(invoice.GrandTotal > 0);
     }
 
     #endregion

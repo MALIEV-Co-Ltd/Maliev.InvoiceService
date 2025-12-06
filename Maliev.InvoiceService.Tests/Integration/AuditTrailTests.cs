@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Audit;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
@@ -78,17 +77,20 @@ public class AuditTrailTests : IAsyncLifetime
 
         var auditTrail = await auditResponse.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
 
-        auditTrail.Should().NotBeNull();
-        auditTrail!.Should().HaveCountGreaterThanOrEqualTo(3);
+        Assert.NotNull(auditTrail);
+        Assert.True(auditTrail!.Count >= 3);
 
         // Verify each lifecycle event is captured
-        auditTrail.Should().Contain(a => a.Action == "Created");
-        auditTrail.Should().Contain(a => a.Action == "Finalized");
-        auditTrail.Should().Contain(a => a.Action == "Cancelled");
+        Assert.Contains(auditTrail, a => a.Action == "Created");
+        Assert.Contains(auditTrail, a => a.Action == "Finalized");
+        Assert.Contains(auditTrail, a => a.Action == "Cancelled");
 
         // Verify audit entries are chronologically ordered
         var timestamps = auditTrail.Select(a => a.Timestamp).ToList();
-        timestamps.Should().BeInAscendingOrder();
+        for (int i = 1; i < timestamps.Count; i++)
+        {
+            Assert.True(timestamps[i] >= timestamps[i - 1], "Timestamps should be in ascending order");
+        }
     }
 
     [Fact]
@@ -135,8 +137,8 @@ public class AuditTrailTests : IAsyncLifetime
         var auditResponse = await _client.GetAsync($"/invoices/v1/audit/invoices/{invoice.Id}");
         var auditTrail = await auditResponse.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
 
-        auditTrail.Should().NotBeNull();
-        auditTrail!.Should().Contain(a => a.Action == "Updated");
+        Assert.NotNull(auditTrail);
+        Assert.Contains(auditTrail!, a => a.Action == "Updated");
     }
 
     [Fact]
@@ -166,12 +168,13 @@ public class AuditTrailTests : IAsyncLifetime
         var auditTrail = await auditResponse.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
 
         // Assert - Verify audit records exist (7-year retention requirement)
-        auditTrail.Should().NotBeNull().And.HaveCountGreaterThanOrEqualTo(1);
+        Assert.NotNull(auditTrail);
+        Assert.True(auditTrail!.Count >= 1);
 
-        foreach (var entry in auditTrail!)
+        foreach (var entry in auditTrail)
         {
-            entry.Timestamp.Should().NotBe(default);
-            entry.Timestamp.Should().BeAfter(DateTime.UtcNow.AddMinutes(-5)); // Recent
+            Assert.NotEqual(default, entry.Timestamp);
+            Assert.True(entry.Timestamp > DateTime.UtcNow.AddMinutes(-5), "Timestamp should be recent");
         }
     }
 

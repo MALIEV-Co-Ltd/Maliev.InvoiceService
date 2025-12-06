@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Tests.Fixtures;
@@ -64,8 +63,8 @@ public class PaymentLinkingTests : IAsyncLifetime
         linkResponse.EnsureSuccessStatusCode();
         var updatedInvoice = await linkResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        updatedInvoice.Should().NotBeNull();
-        updatedInvoice!.Status.Should().Be("PartiallyPaid");
+        Assert.NotNull(updatedInvoice);
+        Assert.Equal("PartiallyPaid", updatedInvoice!.Status);
     }
 
     [Fact]
@@ -97,8 +96,8 @@ public class PaymentLinkingTests : IAsyncLifetime
         linkResponse.EnsureSuccessStatusCode();
         var updatedInvoice = await linkResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        updatedInvoice.Should().NotBeNull();
-        updatedInvoice!.Status.Should().Be("FullyPaid");
+        Assert.NotNull(updatedInvoice);
+        Assert.Equal("FullyPaid", updatedInvoice!.Status);
     }
 
     [Fact]
@@ -145,8 +144,8 @@ public class PaymentLinkingTests : IAsyncLifetime
         linkResponse.EnsureSuccessStatusCode();
         var updatedInvoice = await linkResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        updatedInvoice.Should().NotBeNull();
-        updatedInvoice!.Status.Should().Be("FullyPaid");
+        Assert.NotNull(updatedInvoice);
+        Assert.Equal("FullyPaid", updatedInvoice!.Status);
     }
 
     private async Task<Guid> CreateAndFinalizeInvoiceAsync(decimal grandTotal)

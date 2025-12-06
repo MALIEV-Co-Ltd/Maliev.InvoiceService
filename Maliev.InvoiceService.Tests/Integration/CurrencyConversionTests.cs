@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -68,12 +67,12 @@ public class CurrencyConversionTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        invoice.Should().NotBeNull();
-        invoice!.Currency.Should().Be("USD");
-        invoice.ExchangeRate.Should().NotBeNull();
-        invoice.ExchangeRate!.Value.Should().BeGreaterThan(0);
-        invoice.ExchangeRateSource.Should().NotBeNullOrEmpty();
-        invoice.ExchangeRateSource.Should().Contain("Currency Service");
+        Assert.NotNull(invoice);
+        Assert.Equal("USD", invoice!.Currency);
+        Assert.NotNull(invoice.ExchangeRate);
+        Assert.True(invoice.ExchangeRate!.Value > 0);
+        Assert.False(string.IsNullOrEmpty(invoice.ExchangeRateSource));
+        Assert.Contains("Currency Service", invoice.ExchangeRateSource);
     }
 
     [Fact]
@@ -103,10 +102,10 @@ public class CurrencyConversionTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        invoice.Should().NotBeNull();
-        invoice!.Currency.Should().Be("THB");
-        invoice.ExchangeRate.Should().BeNull();
-        invoice.ExchangeRateSource.Should().BeNullOrEmpty();
+        Assert.NotNull(invoice);
+        Assert.Equal("THB", invoice!.Currency);
+        Assert.Null(invoice.ExchangeRate);
+        Assert.True(string.IsNullOrEmpty(invoice.ExchangeRateSource));
     }
 
     #endregion
@@ -140,8 +139,8 @@ public class CurrencyConversionTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        invoice.Should().NotBeNull();
-        invoice!.Currency.Should().Be("EUR");
+        Assert.NotNull(invoice);
+        Assert.Equal("EUR", invoice!.Currency);
         // Exchange rate may be null if service is unavailable (graceful degradation)
     }
 

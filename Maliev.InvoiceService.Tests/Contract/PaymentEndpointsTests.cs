@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Tests.Fixtures;
@@ -61,17 +60,17 @@ public class PaymentEndpointsTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync("/invoices/v1/payments", request);
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-        response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.PathAndQuery.Should().Contain("/invoices/v1/payments/");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+        Assert.Contains("/invoices/v1/payments/", response.Headers.Location!.PathAndQuery);
 
         var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>();
-        payment.Should().NotBeNull();
-        payment!.Id.Should().NotBeEmpty();
-        payment.PaymentAmount.Should().Be(5000m);
-        payment.PaymentMethod.Should().Be("Bank Transfer");
-        payment.ReferenceNumber.Should().Be("TXN-2025-001");
-        payment.RecordedBy.Should().Be("cashier-1");
+        Assert.NotNull(payment);
+        Assert.NotEqual(Guid.Empty, payment!.Id);
+        Assert.Equal(5000m, payment.PaymentAmount);
+        Assert.Equal("Bank Transfer", payment.PaymentMethod);
+        Assert.Equal("TXN-2025-001", payment.ReferenceNumber);
+        Assert.Equal("cashier-1", payment.RecordedBy);
     }
 
     #endregion
@@ -97,13 +96,13 @@ public class PaymentEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/payments/{created!.Id}");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>();
-        payment.Should().NotBeNull();
-        payment!.Id.Should().Be(created.Id);
-        payment.PaymentAmount.Should().Be(3000m);
-        payment.PaymentMethod.Should().Be("Cash");
+        Assert.NotNull(payment);
+        Assert.Equal(created.Id, payment!.Id);
+        Assert.Equal(3000m, payment.PaymentAmount);
+        Assert.Equal("Cash", payment.PaymentMethod);
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public class PaymentEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/payments/{Guid.NewGuid()}");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     #endregion

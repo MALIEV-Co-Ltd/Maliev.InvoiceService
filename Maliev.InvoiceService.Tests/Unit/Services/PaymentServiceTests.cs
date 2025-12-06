@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.InvoiceService.Data.Models;
 
 namespace Maliev.InvoiceService.Tests.Unit.Services;
@@ -26,16 +25,14 @@ public class PaymentServiceTests
         var allocatedAmount = 1500m; // Exceeds payment amount
 
         // Act & Assert
-        Action validation = () =>
+        var exception = Assert.Throws<ArgumentException>(() =>
         {
             if (allocatedAmount > payment.PaymentAmount)
             {
                 throw new ArgumentException("Allocated amount cannot exceed payment amount");
             }
-        };
-
-        validation.Should().Throw<ArgumentException>()
-            .WithMessage("Allocated amount cannot exceed payment amount");
+        });
+        Assert.Contains("Allocated amount cannot exceed payment amount", exception.Message);
     }
 
     [Fact]
@@ -45,16 +42,14 @@ public class PaymentServiceTests
         var allocatedAmount = -100m;
 
         // Act & Assert
-        Action validation = () =>
+        var exception = Assert.Throws<ArgumentException>(() =>
         {
             if (allocatedAmount <= 0)
             {
                 throw new ArgumentException("Allocated amount must be positive");
             }
-        };
-
-        validation.Should().Throw<ArgumentException>()
-            .WithMessage("Allocated amount must be positive");
+        });
+        Assert.Contains("Allocated amount must be positive", exception.Message);
     }
 
     [Fact]
@@ -71,16 +66,15 @@ public class PaymentServiceTests
         };
         var allocatedAmount = 500m;
 
-        // Act & Assert
-        Action validation = () =>
+        // Act & Assert - should not throw
+        var ex = Record.Exception(() =>
         {
             if (allocatedAmount <= 0)
                 throw new ArgumentException("Allocated amount must be positive");
             if (allocatedAmount > payment.PaymentAmount)
                 throw new ArgumentException("Allocated amount cannot exceed payment amount");
-        };
-
-        validation.Should().NotThrow();
+        });
+        Assert.Null(ex);
     }
 
     [Fact]
@@ -98,7 +92,7 @@ public class PaymentServiceTests
         var totalAllocated = allocations.Sum(a => a.AllocatedAmount);
 
         // Assert
-        totalAllocated.Should().Be(1000);
+        Assert.Equal(1000m, totalAllocated);
     }
 
     [Fact]
@@ -113,7 +107,7 @@ public class PaymentServiceTests
                       totalAllocated > 0 ? "PartiallyPaid" : "Finalized";
 
         // Assert
-        status.Should().Be("Paid");
+        Assert.Equal("Paid", status);
     }
 
     [Fact]
@@ -128,7 +122,8 @@ public class PaymentServiceTests
                       totalAllocated > 0 ? "PartiallyPaid" : "Finalized";
 
         // Assert
-        status.Should().Be("PartiallyPaid");
+        Assert.Equal("PartiallyPaid", status);
+        await Task.CompletedTask; // Keep async signature for consistency
     }
 
     #endregion

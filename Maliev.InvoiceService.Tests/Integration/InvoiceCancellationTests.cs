@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -78,15 +77,15 @@ public class InvoiceCancellationTests : IAsyncLifetime
         cancelResponse.EnsureSuccessStatusCode();
         var cancelled = await cancelResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        cancelled.Should().NotBeNull();
-        cancelled!.Status.Should().Be("Cancelled");
-        cancelled.CancelledAt.Should().NotBeNull();
-        cancelled.CancelledAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
-        cancelled.CancelledBy.Should().Be("admin-user");
-        cancelled.CancellationReason.Should().Be("Customer requested cancellation due to duplicate order");
+        Assert.NotNull(cancelled);
+        Assert.Equal("Cancelled", cancelled!.Status);
+        Assert.NotNull(cancelled.CancelledAt);
+        Assert.True(cancelled.CancelledAt!.Value <= DateTime.UtcNow.AddMinutes(1) && cancelled.CancelledAt.Value >= DateTime.UtcNow.AddMinutes(-1));
+        Assert.Equal("admin-user", cancelled.CancelledBy);
+        Assert.Equal("Customer requested cancellation due to duplicate order", cancelled.CancellationReason);
 
         // Invoice number should remain unchanged
-        cancelled.InvoiceNumber.Should().NotBeNullOrEmpty();
+        Assert.False(string.IsNullOrEmpty(cancelled.InvoiceNumber));
     }
 
     [Fact]
@@ -120,7 +119,7 @@ public class InvoiceCancellationTests : IAsyncLifetime
         var cancelResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/cancel", cancelRequest);
 
         // Assert - Should fail because only finalized invoices can be cancelled
-        cancelResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, cancelResponse.StatusCode);
     }
 
     [Fact]
@@ -169,7 +168,7 @@ public class InvoiceCancellationTests : IAsyncLifetime
         // Assert - Should allow cancellation (business rule: cancellation allowed, refund will be processed separately)
         cancelResponse.EnsureSuccessStatusCode();
         var cancelled = await cancelResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
-        cancelled!.Status.Should().Be("Cancelled");
+        Assert.Equal("Cancelled", cancelled!.Status);
     }
 
     #endregion

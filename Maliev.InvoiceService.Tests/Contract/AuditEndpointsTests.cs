@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Audit;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
@@ -73,22 +72,23 @@ public class AuditEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/audit/invoices/{invoice.Id}");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var auditTrail = await response.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
-        auditTrail.Should().NotBeNull().And.HaveCountGreaterThanOrEqualTo(2);
+        Assert.NotNull(auditTrail);
+        Assert.True(auditTrail!.Count >= 2);
 
         // Verify audit entries contain expected fields
-        auditTrail!.Should().Contain(a => a.Action == "Created");
-        auditTrail.Should().Contain(a => a.Action == "Finalized");
+        Assert.Contains(auditTrail, a => a.Action == "Created");
+        Assert.Contains(auditTrail, a => a.Action == "Finalized");
 
         foreach (var entry in auditTrail)
         {
-            entry.Id.Should().NotBeEmpty();
-            entry.EntityType.Should().Be("Invoice");
-            entry.EntityId.Should().Be(invoice.Id);
-            entry.Action.Should().NotBeNullOrEmpty();
-            entry.Timestamp.Should().NotBe(default);
+            Assert.NotEqual(Guid.Empty, entry.Id);
+            Assert.Equal("Invoice", entry.EntityType);
+            Assert.Equal(invoice.Id, entry.EntityId);
+            Assert.False(string.IsNullOrEmpty(entry.Action));
+            Assert.NotEqual(default, entry.Timestamp);
         }
     }
 
@@ -99,7 +99,7 @@ public class AuditEndpointsTests : IAsyncLifetime
         var response = await _client.GetAsync($"/invoices/v1/audit/invoices/{Guid.NewGuid()}");
 
         // Assert - Contract verification
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     #endregion

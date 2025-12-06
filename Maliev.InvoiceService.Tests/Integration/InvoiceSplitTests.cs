@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using System.Net;
@@ -53,20 +52,20 @@ public class InvoiceSplitTests : IAsyncLifetime
             var errorContent = await splitResponse.Content.ReadAsStringAsync();
             throw new Exception($"Request failed with status {splitResponse.StatusCode}: {errorContent}");
         }
-        splitResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, splitResponse.StatusCode);
         var childInvoices = await splitResponse.Content.ReadFromJsonAsync<List<InvoiceResponse>>();
 
-        childInvoices.Should().NotBeNull();
-        childInvoices.Should().HaveCount(2);
+        Assert.NotNull(childInvoices);
+        Assert.Equal(2, childInvoices!.Count);
 
         // Each child should have 50% of the parent amounts
-        foreach (var child in childInvoices!)
+        foreach (var child in childInvoices)
         {
-            child.Subtotal.Should().Be(500m); // 50% of 1000
-            child.TaxAmount.Should().Be(35m); // 50% of 70
-            child.GrandTotal.Should().Be(535m); // 50% of 1070
-            child.ParentInvoiceId.Should().Be(invoiceId);
-            child.Status.Should().Be("Finalized");
+            Assert.Equal(500m, child.Subtotal); // 50% of 1000
+            Assert.Equal(35m, child.TaxAmount); // 50% of 70
+            Assert.Equal(535m, child.GrandTotal); // 50% of 1070
+            Assert.Equal(invoiceId, child.ParentInvoiceId);
+            Assert.Equal("Finalized", child.Status);
         }
     }
 
@@ -92,15 +91,15 @@ public class InvoiceSplitTests : IAsyncLifetime
         splitResponse.EnsureSuccessStatusCode();
         var childInvoices = await splitResponse.Content.ReadFromJsonAsync<List<InvoiceResponse>>();
 
-        childInvoices.Should().HaveCount(2);
+        Assert.Equal(2, childInvoices!.Count);
 
-        var largerChild = childInvoices![0];
-        largerChild.Subtotal.Should().Be(700m); // 70% of 1000
-        largerChild.GrandTotal.Should().Be(749m); // 70% of 1070
+        var largerChild = childInvoices[0];
+        Assert.Equal(700m, largerChild.Subtotal); // 70% of 1000
+        Assert.Equal(749m, largerChild.GrandTotal); // 70% of 1070
 
         var smallerChild = childInvoices[1];
-        smallerChild.Subtotal.Should().Be(300m); // 30% of 1000
-        smallerChild.GrandTotal.Should().Be(321m); // 30% of 1070
+        Assert.Equal(300m, smallerChild.Subtotal); // 30% of 1000
+        Assert.Equal(321m, smallerChild.GrandTotal); // 30% of 1070
     }
 
     [Fact]
@@ -122,7 +121,7 @@ public class InvoiceSplitTests : IAsyncLifetime
         var splitResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoiceId}/split", splitRequest);
 
         // Assert
-        splitResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, splitResponse.StatusCode);
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public class InvoiceSplitTests : IAsyncLifetime
         var splitResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/split", splitRequest);
 
         // Assert
-        splitResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        Assert.Equal(HttpStatusCode.Conflict, splitResponse.StatusCode);
     }
 
     private async Task<Guid> CreateAndFinalizeInvoiceAsync()

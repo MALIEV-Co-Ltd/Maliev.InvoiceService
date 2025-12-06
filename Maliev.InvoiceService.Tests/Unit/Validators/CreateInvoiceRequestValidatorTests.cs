@@ -1,4 +1,3 @@
-using FluentAssertions;
 using FluentValidation.TestHelper;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Validators;

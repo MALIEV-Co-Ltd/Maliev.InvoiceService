@@ -1,8 +1,8 @@
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -70,15 +70,15 @@ public class InvoiceFinalizationTests : IAsyncLifetime
             var errorContent = await finalizeResponse.Content.ReadAsStringAsync();
             throw new Exception($"Request failed with status {finalizeResponse.StatusCode}: {errorContent}");
         }
-        finalizeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, finalizeResponse.StatusCode);
         var finalizedInvoice = await finalizeResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        finalizedInvoice.Should().NotBeNull();
-        finalizedInvoice!.Status.Should().Be("Finalized");
-        finalizedInvoice.InvoiceNumber.Should().NotBeNullOrEmpty();
-        finalizedInvoice.InvoiceNumber.Should().MatchRegex(@"^INV-\d{8}-\d{6}$");
-        finalizedInvoice.FinalizedAt.Should().NotBeNull();
-        finalizedInvoice.FinalizedBy.Should().Be("test-user");
+        Assert.NotNull(finalizedInvoice);
+        Assert.Equal("Finalized", finalizedInvoice!.Status);
+        Assert.False(string.IsNullOrEmpty(finalizedInvoice.InvoiceNumber));
+        Assert.Matches(@"^INV-\d{8}-\d{6}$", finalizedInvoice.InvoiceNumber);
+        Assert.NotNull(finalizedInvoice.FinalizedAt);
+        Assert.Equal("test-user", finalizedInvoice.FinalizedBy);
     }
 
     [Fact]
@@ -137,13 +137,13 @@ public class InvoiceFinalizationTests : IAsyncLifetime
         var finalized2 = await finalizeResponse2.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Extract sequence numbers
-        finalized1!.InvoiceNumber.Should().NotBeNullOrEmpty();
-        finalized2!.InvoiceNumber.Should().NotBeNullOrEmpty();
+        Assert.False(string.IsNullOrEmpty(finalized1!.InvoiceNumber));
+        Assert.False(string.IsNullOrEmpty(finalized2!.InvoiceNumber));
 
         var seq1 = int.Parse(finalized1.InvoiceNumber!.Split('-')[2]);
         var seq2 = int.Parse(finalized2.InvoiceNumber!.Split('-')[2]);
 
-        seq2.Should().Be(seq1 + 1, "second invoice should have incremented sequence number");
+        Assert.Equal(seq1 + 1, seq2); // second invoice should have incremented sequence number
     }
 
     [Fact]
@@ -176,6 +176,6 @@ public class InvoiceFinalizationTests : IAsyncLifetime
         var secondFinalizeResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/finalize", finalizeRequest);
 
         // Assert
-        secondFinalizeResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        Assert.Equal(HttpStatusCode.Conflict, secondFinalizeResponse.StatusCode);
     }
 }

@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
@@ -61,10 +60,10 @@ public class InvoiceSearchTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<PaginatedResponse<InvoiceResponse>>();
 
-        result.Should().NotBeNull();
-        result!.Items.Should().NotBeNull();
-        result.Items.Should().OnlyContain(i => i.Status == "Finalized");
-        result.Items.Should().Contain(i => i.Id == finalizedId);
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Items);
+        Assert.All(result.Items, i => Assert.Equal("Finalized", i.Status));
+        Assert.Contains(result.Items, i => i.Id == finalizedId);
     }
 
     [Fact]
@@ -84,9 +83,9 @@ public class InvoiceSearchTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<PaginatedResponse<InvoiceResponse>>();
 
-        result.Should().NotBeNull();
-        result!.Items.Should().NotBeNull();
-        result.Items.Should().OnlyContain(i => i.CustomerId == targetCustomerId);
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Items);
+        Assert.All(result.Items, i => Assert.Equal(targetCustomerId, i.CustomerId));
     }
 
     [Fact]
@@ -106,11 +105,12 @@ public class InvoiceSearchTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<PaginatedResponse<InvoiceResponse>>();
 
-        result.Should().NotBeNull();
-        result!.Items.Should().NotBeNull().And.HaveCountLessThanOrEqualTo(2);
-        result.Page.Should().Be(1);
-        result.PageSize.Should().Be(2);
-        result.TotalCount.Should().BeGreaterThanOrEqualTo(5);
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Items);
+        Assert.True(result.Items.Count() <= 2);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(2, result.PageSize);
+        Assert.True(result.TotalCount >= 5);
     }
 
     [Fact]
@@ -130,9 +130,13 @@ public class InvoiceSearchTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<PaginatedResponse<InvoiceResponse>>();
 
-        result.Should().NotBeNull();
-        result!.Items.Should().NotBeNull();
-        result.Items.Should().OnlyContain(i => i.Status == "Finalized" && i.CustomerId == targetCustomerId);
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Items);
+        Assert.All(result.Items, i => 
+        {
+            Assert.Equal("Finalized", i.Status);
+            Assert.Equal(targetCustomerId, i.CustomerId);
+        });
     }
 
     #endregion

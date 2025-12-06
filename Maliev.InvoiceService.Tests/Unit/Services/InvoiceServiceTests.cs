@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Services;
 using Maliev.InvoiceService.Api.Services.External;
@@ -8,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Testcontainers.PostgreSql;
+using Xunit;
 
 namespace Maliev.InvoiceService.Tests.Unit.Services;
 
@@ -15,12 +16,13 @@ namespace Maliev.InvoiceService.Tests.Unit.Services;
 /// Unit tests for InvoiceService business logic
 /// T099, T107, T119, T130, T150 per tasks.md
 /// </summary>
-public class InvoiceServiceTests
+public class InvoiceServiceTests : IAsyncLifetime
 {
     private readonly Mock<ILogger<Api.Services.InvoiceService>> _loggerMock;
     private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<ICurrencyServiceClient> _currencyClientMock;
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
+    private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().Build();
 
     public InvoiceServiceTests()
     {
@@ -30,12 +32,26 @@ public class InvoiceServiceTests
         _quotationClientMock = new Mock<IQuotationServiceClient>();
     }
 
-    private InvoiceDbContext CreateInMemoryContext()
+    public async Task InitializeAsync()
+    {
+        await _postgreSqlContainer.StartAsync();
+        using var context = CreateDbContext(); // Use CreateDbContext here once for initial setup
+        await context.Database.MigrateAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _postgreSqlContainer.StopAsync();
+    }
+
+    private InvoiceDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<InvoiceDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseNpgsql(_postgreSqlContainer.GetConnectionString())
             .Options;
-        return new InvoiceDbContext(options);
+        var context = new InvoiceDbContext(options);
+        // EnsureCreated() removed, MigrateAsync in InitializeAsync handles schema
+        return context;
     }
 
     #region T099 - Withholding Tax Calculation
@@ -52,7 +68,7 @@ public class InvoiceServiceTests
         var result = CalculateWithholdingTaxHelper(subtotal, taxAmount, withholdingPercentage);
 
         // Assert
-        result.Should().Be(expectedWithholding);
+        Assert.Equal(expectedWithholding, result);
     }
 
     private static decimal CalculateWithholdingTaxHelper(decimal subtotal, decimal taxAmount, decimal withholdingTaxPercentage)
@@ -92,9 +108,9 @@ public class InvoiceServiceTests
         var reconciledTax = childTotals.Sum(c => c.Tax);
         var reconciledGrandTotal = childTotals.Sum(c => c.GrandTotal);
 
-        reconciledSubtotal.Should().Be(parentSubtotal);
-        reconciledTax.Should().Be(parentTax);
-        reconciledGrandTotal.Should().Be(parentGrandTotal);
+        Assert.Equal(parentSubtotal, reconciledSubtotal);
+        Assert.Equal(parentTax, reconciledTax);
+        Assert.Equal(parentGrandTotal, reconciledGrandTotal);
     }
 
     [Fact]
@@ -116,7 +132,7 @@ public class InvoiceServiceTests
 
         // Assert
         var reconciledGrandTotal = childTotals.Sum(c => c.GrandTotal);
-        reconciledGrandTotal.Should().Be(parentGrandTotal);
+        Assert.Equal(parentGrandTotal, reconciledGrandTotal);
     }
 
     #endregion
@@ -127,7 +143,8 @@ public class InvoiceServiceTests
     public async Task SearchFilter_ByStatus_ReturnsMatchingInvoices()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
         context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
         context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Finalized", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
         await context.SaveChangesAsync();
@@ -136,8 +153,10 @@ public class InvoiceServiceTests
         var results = await context.Invoices.Where(i => i.Status == "Draft").ToListAsync();
 
         // Assert
-        results.Should().HaveCount(1);
-        results.First().Status.Should().Be("Draft");
+        Assert.Single(results);
+        Assert.Equal("Draft", results.First().Status);
+
+        await transaction.RollbackAsync();
     }
 
     [Fact]
@@ -145,7 +164,8 @@ public class InvoiceServiceTests
     {
         // Arrange
         var targetCustomerId = Guid.NewGuid();
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
         context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = targetCustomerId, Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
         context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
         await context.SaveChangesAsync();
@@ -154,8 +174,10 @@ public class InvoiceServiceTests
         var results = await context.Invoices.Where(i => i.CustomerId == targetCustomerId).ToListAsync();
 
         // Assert
-        results.Should().HaveCount(1);
-        results.First().CustomerId.Should().Be(targetCustomerId);
+        Assert.Single(results);
+        Assert.Equal(targetCustomerId, results.First().CustomerId);
+
+        await transaction.RollbackAsync();
     }
 
     #endregion
@@ -181,24 +203,23 @@ public class InvoiceServiceTests
         };
 
         // Act & Assert
-        Action attemptModification = () =>
+        var exception = Assert.Throws<InvalidOperationException>(() =>
         {
             if (invoice.Status == "Finalized")
             {
                 throw new InvalidOperationException("Cannot modify finalized invoice");
             }
             invoice.Subtotal = 1000m;
-        };
-
-        attemptModification.Should().Throw<InvalidOperationException>()
-            .WithMessage("Cannot modify finalized invoice");
+        });
+        Assert.Contains("Cannot modify finalized invoice", exception.Message);
     }
 
     [Fact]
     public async Task UpdateInvoiceAsync_FinalizedInvoice_ThrowsInvalidOperationExceptionAndLogsAudit()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
         var invoiceId = Guid.NewGuid();
         var invoice = new Invoice
         {
@@ -234,25 +255,26 @@ public class InvoiceServiceTests
             Lines = new List<InvoiceLineItemRequest>()
         };
 
-        // Act
-        var act = () => service.UpdateInvoiceAsync(invoiceId, updateRequest, CancellationToken.None);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Finalized*");
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.UpdateInvoiceAsync(invoiceId, updateRequest, CancellationToken.None));
+        Assert.Contains("Finalized", exception.Message);
 
         // Verify audit log was created
         var auditLog = await context.AuditLogs
             .FirstOrDefaultAsync(a => a.InvoiceId == invoiceId && a.EventType == "UpdateAttemptRejected");
-        auditLog.Should().NotBeNull();
-        auditLog!.ActorId.Should().Be("System");
+        Assert.NotNull(auditLog);
+        Assert.Equal("System", auditLog!.ActorId);
+
+        await transaction.RollbackAsync();
     }
 
     [Fact]
     public async Task UpdateInvoiceAsync_CancelledInvoice_ThrowsInvalidOperationException()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
         var invoiceId = Guid.NewGuid();
         var invoice = new Invoice
         {
@@ -288,19 +310,20 @@ public class InvoiceServiceTests
             Lines = new List<InvoiceLineItemRequest>()
         };
 
-        // Act
-        var act = () => service.UpdateInvoiceAsync(invoiceId, updateRequest, CancellationToken.None);
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.UpdateInvoiceAsync(invoiceId, updateRequest, CancellationToken.None));
+        Assert.Contains("Cancelled", exception.Message);
 
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Cancelled*");
+        await transaction.RollbackAsync();
     }
 
     [Fact]
     public async Task UpdateInvoiceAsync_DraftInvoice_Succeeds()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
         var customerId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
         var invoice = new Invoice
@@ -352,9 +375,11 @@ public class InvoiceServiceTests
         var result = await service.UpdateInvoiceAsync(invoiceId, updateRequest, CancellationToken.None);
 
         // Assert
-        result.Should().NotBeNull();
-        result.CustomerName.Should().Be("Updated Customer");
-        result.Status.Should().Be("Draft");
+        Assert.NotNull(result);
+        Assert.Equal("Updated Customer", result.CustomerName);
+        Assert.Equal("Draft", result.Status);
+
+        await transaction.RollbackAsync();
     }
 
     #endregion
@@ -365,7 +390,8 @@ public class InvoiceServiceTests
     public async Task CreateInvoiceAsync_WithForeignCurrency_StoresExchangeRate()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
 
         _currencyClientMock
             .Setup(x => x.GetExchangeRateAsync("USD", "THB", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
@@ -401,23 +427,26 @@ public class InvoiceServiceTests
         var result = await service.CreateInvoiceAsync(request, CancellationToken.None);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Currency.Should().Be("USD");
-        result.ExchangeRate.Should().Be(35.50m);
-        result.ExchangeRateSource.Should().Be("Currency Service");
+        Assert.NotNull(result);
+        Assert.Equal("USD", result.Currency);
+        Assert.Equal(35.50m, result.ExchangeRate);
+        Assert.Equal("Currency Service", result.ExchangeRateSource);
 
         // Verify it was persisted to database
         var invoiceFromDb = await context.Invoices.FirstOrDefaultAsync(i => i.Id == result.Id);
-        invoiceFromDb.Should().NotBeNull();
-        invoiceFromDb!.ExchangeRate.Should().Be(35.50m);
-        invoiceFromDb.ExchangeRateSource.Should().Be("Currency Service");
+        Assert.NotNull(invoiceFromDb);
+        Assert.Equal(35.50m, invoiceFromDb!.ExchangeRate);
+        Assert.Equal("Currency Service", invoiceFromDb.ExchangeRateSource);
+
+        await transaction.RollbackAsync();
     }
 
     [Fact]
     public async Task CreateInvoiceAsync_WithTHB_DoesNotFetchExchangeRate()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
 
         var service = new Api.Services.InvoiceService(
             context,
@@ -449,16 +478,18 @@ public class InvoiceServiceTests
         var result = await service.CreateInvoiceAsync(request, CancellationToken.None);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Currency.Should().Be("THB");
-        result.ExchangeRate.Should().BeNull();
-        result.ExchangeRateSource.Should().BeNullOrEmpty();
+        Assert.NotNull(result);
+        Assert.Equal("THB", result.Currency);
+        Assert.Null(result.ExchangeRate);
+        Assert.True(string.IsNullOrEmpty(result.ExchangeRateSource));
 
         // Verify currency service was never called
         _currencyClientMock.Verify(
             x => x.GetExchangeRateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Never
         );
+
+        await transaction.RollbackAsync();
     }
 
     [Fact]
@@ -482,8 +513,8 @@ public class InvoiceServiceTests
         invoice.ExchangeRateSource = "Currency Service";
 
         // Assert
-        invoice.ExchangeRate.Should().Be(35.50m);
-        invoice.ExchangeRateSource.Should().Be("Currency Service");
+        Assert.Equal(35.50m, invoice.ExchangeRate);
+        Assert.Equal("Currency Service", invoice.ExchangeRateSource);
     }
 
     [Fact]
@@ -503,8 +534,8 @@ public class InvoiceServiceTests
         };
 
         // Act & Assert
-        invoice.ExchangeRate.Should().BeNull();
-        invoice.ExchangeRateSource.Should().BeNullOrEmpty();
+        Assert.Null(invoice.ExchangeRate);
+        Assert.True(string.IsNullOrEmpty(invoice.ExchangeRateSource));
     }
 
     #endregion

@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -81,15 +80,15 @@ public class FileReferenceTests : IAsyncLifetime
         fileResponse.EnsureSuccessStatusCode();
         var fileRef = await fileResponse.Content.ReadFromJsonAsync<FileReferenceResponse>();
 
-        fileRef.Should().NotBeNull();
-        fileRef!.Id.Should().NotBeEmpty();
-        fileRef.InvoiceId.Should().Be(invoice.Id);
-        fileRef.FileType.Should().Be("PDF");
-        fileRef.FileUrl.Should().Be("https://storage.example.com/invoices/INV-20250112-000001.pdf");
-        fileRef.FileSizeBytes.Should().Be(245678);
-        fileRef.GeneratedBy.Should().Be("pdf-service");
-        fileRef.Checksum.Should().Be("sha256:abcdef123456");
-        fileRef.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        Assert.NotNull(fileRef);
+        Assert.NotEqual(Guid.Empty, fileRef!.Id);
+        Assert.Equal(invoice.Id, fileRef.InvoiceId);
+        Assert.Equal("PDF", fileRef.FileType);
+        Assert.Equal("https://storage.example.com/invoices/INV-20250112-000001.pdf", fileRef.FileUrl);
+        Assert.Equal(245678L, fileRef.FileSizeBytes);
+        Assert.Equal("pdf-service", fileRef.GeneratedBy);
+        Assert.Equal("sha256:abcdef123456", fileRef.Checksum);
+        Assert.True(fileRef.CreatedAt <= DateTime.UtcNow.AddMinutes(1) && fileRef.CreatedAt >= DateTime.UtcNow.AddMinutes(-1));
     }
 
     [Fact]
@@ -142,9 +141,10 @@ public class FileReferenceTests : IAsyncLifetime
         getResponse.EnsureSuccessStatusCode();
         var files = await getResponse.Content.ReadFromJsonAsync<List<FileReferenceResponse>>();
 
-        files.Should().NotBeNull().And.HaveCount(2);
-        files!.Should().Contain(f => f.FileType == "PDF");
-        files.Should().Contain(f => f.FileType == "XML");
+        Assert.NotNull(files);
+        Assert.Equal(2, files!.Count);
+        Assert.Contains(files, f => f.FileType == "PDF");
+        Assert.Contains(files, f => f.FileType == "XML");
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class FileReferenceTests : IAsyncLifetime
         var fileResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/files", fileRequest);
 
         // Assert - Should fail (only finalized invoices can have files registered)
-        fileResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, fileResponse.StatusCode);
     }
 
     #endregion
@@ -222,14 +222,14 @@ public class FileReferenceTests : IAsyncLifetime
             pdfReferenceRequest);
 
         // Assert
-        patchResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, patchResponse.StatusCode);
 
         // Verify pdf_file_reference field is updated
         var getResponse = await _client.GetAsync($"/invoices/v1/invoices/{invoice.Id}");
         var updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        updatedInvoice.Should().NotBeNull();
-        updatedInvoice!.PdfFileReference.Should().Be("https://storage.googleapis.com/maliev-invoices/INV-20250112-000001.pdf");
+        Assert.NotNull(updatedInvoice);
+        Assert.Equal("https://storage.googleapis.com/maliev-invoices/INV-20250112-000001.pdf", updatedInvoice!.PdfFileReference);
     }
 
     [Fact]
@@ -264,10 +264,10 @@ public class FileReferenceTests : IAsyncLifetime
             pdfReferenceRequest);
 
         // Assert - Should fail with BadRequest (business rule: only finalized invoices)
-        patchResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, patchResponse.StatusCode);
 
         var errorContent = await patchResponse.Content.ReadAsStringAsync();
-        errorContent.Should().Contain("Cannot register PDF file reference for draft invoice");
+        Assert.Contains("Cannot register PDF file reference for draft invoice", errorContent);
     }
 
     [Fact]
@@ -286,7 +286,7 @@ public class FileReferenceTests : IAsyncLifetime
             pdfReferenceRequest);
 
         // Assert
-        patchResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, patchResponse.StatusCode);
     }
 
     [Fact]
@@ -328,11 +328,11 @@ public class FileReferenceTests : IAsyncLifetime
         var getResponse = await _client.GetAsync($"/invoices/v1/invoices/{invoice.Id}");
         var updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        updatedInvoice!.PdfFileReference.Should().Be("https://storage.googleapis.com/maliev-invoices/cached-test.pdf");
+        Assert.Equal("https://storage.googleapis.com/maliev-invoices/cached-test.pdf", updatedInvoice!.PdfFileReference);
 
         // Verify audit log created (we can check this via database or audit endpoint if available)
         // For now, the successful update confirms audit logging worked without throwing errors
-        updatedInvoice.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        Assert.True(updatedInvoice.UpdatedAt <= DateTime.UtcNow.AddMinutes(1) && updatedInvoice.UpdatedAt >= DateTime.UtcNow.AddMinutes(-1));
     }
 
     [Fact]
@@ -367,7 +367,7 @@ public class FileReferenceTests : IAsyncLifetime
             invalidRequest);
 
         // Assert
-        patchResponse.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, patchResponse.StatusCode);
     }
 
     #endregion

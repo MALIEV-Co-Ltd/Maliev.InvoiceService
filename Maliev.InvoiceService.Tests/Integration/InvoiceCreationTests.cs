@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using System.Net;
@@ -65,12 +64,12 @@ public class InvoiceCreationTests : IAsyncLifetime
             var errorContent = await response.Content.ReadAsStringAsync();
             throw new Exception($"Request failed with status {response.StatusCode}: {errorContent}");
         }
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        invoice.Should().NotBeNull();
-        invoice!.CustomerName.Should().Be("Test Customer");
-        invoice.Status.Should().Be("Draft");
-        invoice.Lines.Should().HaveCount(1);
+        Assert.NotNull(invoice);
+        Assert.Equal("Test Customer", invoice!.CustomerName);
+        Assert.Equal("Draft", invoice.Status);
+        Assert.Single(invoice.Lines);
     }
 
     [Fact]
@@ -110,12 +109,12 @@ public class InvoiceCreationTests : IAsyncLifetime
             var errorContent = await response.Content.ReadAsStringAsync();
             throw new Exception($"Request failed with status {response.StatusCode}: {errorContent}");
         }
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        invoice.Should().NotBeNull();
-        invoice!.Subtotal.Should().Be(1000);
-        invoice.TaxAmount.Should().Be(70); // 7% of 1000
-        invoice.WithholdingTaxAmount.Should().Be(30); // 3% of 1000
-        invoice.GrandTotal.Should().Be(1040); // 1000 + 70 - 30
+        Assert.NotNull(invoice);
+        Assert.Equal(1000m, invoice!.Subtotal);
+        Assert.Equal(70m, invoice.TaxAmount); // 7% of 1000
+        Assert.Equal(30m, invoice.WithholdingTaxAmount); // 3% of 1000
+        Assert.Equal(1040m, invoice.GrandTotal); // 1000 + 70 - 30
     }
 }
