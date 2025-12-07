@@ -33,7 +33,7 @@ public class PaymentServiceClient : IPaymentServiceClient
     /// <inheritdoc/>
     public async Task<ExternalPaymentResponse?> GetPaymentAsync(Guid paymentId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Fetching payment details from Payment Service: PaymentId={PaymentId}", paymentId);
+        _logger.LogDebug("Fetching payment details from Payment Service: PaymentId={PaymentId}", paymentId);
 
         try
         {
