@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Audit;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Contract;
 
@@ -11,40 +10,20 @@ namespace Maliev.InvoiceService.Tests.Contract;
 /// Contract tests for Audit endpoints
 /// T128 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class AuditEndpointsTests : IAsyncLifetime
+public class AuditEndpointsTests : BaseContractTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public AuditEndpointsTests(TestDatabaseFixture dbFixture)
+    public AuditEndpointsTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
     }
 
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
-    }
-
-    #region T128 - GET /invoices/v1/audit/invoices/{id}
+    #region T128 - GET /invoice/v1/audit/invoices/{id}
 
     [Fact]
     public async Task GET_AuditInvoicesById_WithInvoiceHistory_Returns200OK_WithAuditTrail()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create invoice, finalize it, cancel it to generate audit trail
         var createRequest = new CreateInvoiceRequest
         {
@@ -61,15 +40,15 @@ public class AuditEndpointsTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Finalize to create another audit entry
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/audit/invoices/{invoice.Id}");
+        var response = await Client.GetAsync($"/invoice/v1/audit/invoices/{invoice.Id}");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -95,8 +74,11 @@ public class AuditEndpointsTests : IAsyncLifetime
     [Fact]
     public async Task GET_AuditInvoicesById_WithNonExistentInvoice_Returns404NotFound()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/audit/invoices/{Guid.NewGuid()}");
+        var response = await Client.GetAsync($"/invoice/v1/audit/invoices/{Guid.NewGuid()}");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

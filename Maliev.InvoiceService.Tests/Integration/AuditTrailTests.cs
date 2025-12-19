@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Audit;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -10,33 +9,10 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Integration tests for audit trail capture
 /// T129 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class AuditTrailTests : IAsyncLifetime
+public class AuditTrailTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public AuditTrailTests(TestDatabaseFixture dbFixture)
+    public AuditTrailTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-    }
-
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     #region T129 - Audit Trail Capture
@@ -44,6 +20,9 @@ public class AuditTrailTests : IAsyncLifetime
     [Fact]
     public async Task InvoiceLifecycle_CapturesAllAuditEvents()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange & Act - Create invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -60,19 +39,19 @@ public class AuditTrailTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Finalize invoice
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Cancel invoice
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}/cancel",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}/cancel",
             new CancelInvoiceRequest { CancelledBy = "admin", CancellationReason = "Test cancellation" });
 
         // Assert - Retrieve audit trail
-        var auditResponse = await _client.GetAsync($"/invoices/v1/audit/invoices/{invoice.Id}");
+        var auditResponse = await Client.GetAsync($"/invoice/v1/audit/invoices/{invoice.Id}");
         auditResponse.EnsureSuccessStatusCode();
 
         var auditTrail = await auditResponse.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
@@ -96,6 +75,9 @@ public class AuditTrailTests : IAsyncLifetime
     [Fact]
     public async Task InvoiceUpdate_CapturesUpdateAuditEvent()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -112,7 +94,7 @@ public class AuditTrailTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Update invoice
@@ -131,10 +113,10 @@ public class AuditTrailTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Updated Product", Quantity = 2, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        await _client.PutAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}", updateRequest);
+        await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}", updateRequest);
 
         // Assert - Check audit trail
-        var auditResponse = await _client.GetAsync($"/invoices/v1/audit/invoices/{invoice.Id}");
+        var auditResponse = await Client.GetAsync($"/invoice/v1/audit/invoices/{invoice.Id}");
         var auditTrail = await auditResponse.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
 
         Assert.NotNull(auditTrail);
@@ -144,6 +126,9 @@ public class AuditTrailTests : IAsyncLifetime
     [Fact]
     public async Task AuditLog_Contains7YearRetentionMetadata()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -160,11 +145,11 @@ public class AuditTrailTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Retrieve audit
-        var auditResponse = await _client.GetAsync($"/invoices/v1/audit/invoices/{invoice!.Id}");
+        var auditResponse = await Client.GetAsync($"/invoice/v1/audit/invoices/{invoice!.Id}");
         var auditTrail = await auditResponse.Content.ReadFromJsonAsync<List<AuditLogResponse>>();
 
         // Assert - Verify audit records exist (7-year retention requirement)

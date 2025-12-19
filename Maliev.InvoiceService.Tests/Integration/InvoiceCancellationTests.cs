@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -9,33 +8,10 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Integration tests for invoice cancellation workflow
 /// T142 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class InvoiceCancellationTests : IAsyncLifetime
+public class InvoiceCancellationTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public InvoiceCancellationTests(TestDatabaseFixture dbFixture)
+    public InvoiceCancellationTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-    }
-
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     #region T142 - Cancellation Workflow
@@ -43,6 +19,9 @@ public class InvoiceCancellationTests : IAsyncLifetime
     [Fact]
     public async Task CancelInvoice_FinalizedInvoice_UpdatesStatusAndRecordsDetails()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -59,10 +38,10 @@ public class InvoiceCancellationTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act - Cancel invoice
@@ -71,7 +50,7 @@ public class InvoiceCancellationTests : IAsyncLifetime
             CancelledBy = "admin-user",
             CancellationReason = "Customer requested cancellation due to duplicate order"
         };
-        var cancelResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/cancel", cancelRequest);
+        var cancelResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft.Id}/cancel", cancelRequest);
 
         // Assert
         cancelResponse.EnsureSuccessStatusCode();
@@ -91,6 +70,9 @@ public class InvoiceCancellationTests : IAsyncLifetime
     [Fact]
     public async Task CancelInvoice_DraftInvoice_ThrowsConflict()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice (not finalized)
         var createRequest = new CreateInvoiceRequest
         {
@@ -107,7 +89,7 @@ public class InvoiceCancellationTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Try to cancel draft invoice
@@ -116,7 +98,7 @@ public class InvoiceCancellationTests : IAsyncLifetime
             CancelledBy = "admin-user",
             CancellationReason = "Test"
         };
-        var cancelResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/cancel", cancelRequest);
+        var cancelResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/cancel", cancelRequest);
 
         // Assert - Should fail because only finalized invoices can be cancelled
         Assert.Equal(System.Net.HttpStatusCode.Conflict, cancelResponse.StatusCode);
@@ -125,6 +107,9 @@ public class InvoiceCancellationTests : IAsyncLifetime
     [Fact]
     public async Task CancelInvoice_WithPayments_StillAllowsCancellation()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create, finalize, and add payment to invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -141,14 +126,14 @@ public class InvoiceCancellationTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Add payment
-        var paymentResponse = await _client.PostAsJsonAsync("/invoices/v1/payments", new
+        var paymentResponse = await Client.PostAsJsonAsync("/invoice/v1/payments", new
         {
             PaymentAmount = 500m,
             PaymentDate = DateTime.UtcNow,
@@ -163,7 +148,7 @@ public class InvoiceCancellationTests : IAsyncLifetime
             CancelledBy = "manager",
             CancellationReason = "Cancellation despite payment received - will issue refund"
         };
-        var cancelResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}/cancel", cancelRequest);
+        var cancelResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}/cancel", cancelRequest);
 
         // Assert - Should allow cancellation (business rule: cancellation allowed, refund will be processed separately)
         cancelResponse.EnsureSuccessStatusCode();

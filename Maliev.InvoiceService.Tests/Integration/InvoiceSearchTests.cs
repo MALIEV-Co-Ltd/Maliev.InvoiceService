@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -10,33 +9,10 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Integration tests for invoice search with multiple filters
 /// T118 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class InvoiceSearchTests : IAsyncLifetime
+public class InvoiceSearchTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public InvoiceSearchTests(TestDatabaseFixture dbFixture)
+    public InvoiceSearchTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-    }
-
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     #region T118 - Invoice Search with Multiple Filters
@@ -44,6 +20,9 @@ public class InvoiceSearchTests : IAsyncLifetime
     [Fact]
     public async Task SearchInvoices_FilterByStatus_ReturnsOnlyMatchingInvoices()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create invoices with different statuses
         var customerId = Guid.NewGuid();
 
@@ -54,7 +33,7 @@ public class InvoiceSearchTests : IAsyncLifetime
         var finalizedId = await CreateInvoiceAsync(customerId, "Finalized Customer", finalize: true);
 
         // Act
-        var response = await _client.GetAsync("/invoices/v1/invoices?status=Finalized");
+        var response = await Client.GetAsync("/invoice/v1/invoices?status=Finalized");
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -69,7 +48,9 @@ public class InvoiceSearchTests : IAsyncLifetime
     [Fact]
     public async Task SearchInvoices_FilterByCustomerId_ReturnsOnlyCustomerInvoices()
     {
-        // Arrange
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         var targetCustomerId = Guid.NewGuid();
         var otherCustomerId = Guid.NewGuid();
 
@@ -77,7 +58,7 @@ public class InvoiceSearchTests : IAsyncLifetime
         await CreateInvoiceAsync(otherCustomerId, "Other Customer", finalize: false);
 
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/invoices?customerId={targetCustomerId}");
+        var response = await Client.GetAsync($"/invoice/v1/invoices?customerId={targetCustomerId}");
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -91,6 +72,9 @@ public class InvoiceSearchTests : IAsyncLifetime
     [Fact]
     public async Task SearchInvoices_WithPagination_ReturnsCorrectPageSize()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create multiple invoices
         var customerId = Guid.NewGuid();
         for (int i = 0; i < 5; i++)
@@ -99,7 +83,7 @@ public class InvoiceSearchTests : IAsyncLifetime
         }
 
         // Act
-        var response = await _client.GetAsync("/invoices/v1/invoices?page=1&pageSize=2");
+        var response = await Client.GetAsync("/invoice/v1/invoices?page=1&pageSize=2");
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -116,7 +100,9 @@ public class InvoiceSearchTests : IAsyncLifetime
     [Fact]
     public async Task SearchInvoices_CombinedFilters_ReturnsIntersectionOfFilters()
     {
-        // Arrange
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         var targetCustomerId = Guid.NewGuid();
 
         await CreateInvoiceAsync(targetCustomerId, "Target Draft", finalize: false);
@@ -124,7 +110,7 @@ public class InvoiceSearchTests : IAsyncLifetime
         await CreateInvoiceAsync(Guid.NewGuid(), "Other Finalized", finalize: true);
 
         // Act - Filter by both status AND customerId
-        var response = await _client.GetAsync($"/invoices/v1/invoices?status=Finalized&customerId={targetCustomerId}");
+        var response = await Client.GetAsync($"/invoice/v1/invoices?status=Finalized&customerId={targetCustomerId}");
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -159,12 +145,12 @@ public class InvoiceSearchTests : IAsyncLifetime
             }
         };
 
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         if (finalize)
         {
-            await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+            await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
                 new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
         }
 

@@ -5,32 +5,17 @@ using System.Net.Http.Json;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
-[Collection("Database Collection")]
-public class InvoiceCreationTests : IAsyncLifetime
+public class InvoiceCreationTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
-    public InvoiceCreationTests(TestDatabaseFixture dbFixture)
+    public InvoiceCreationTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-        _client = _factory.CreateClient();
-    }
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     [Fact]
     public async Task CreateInvoice_WithValidData_ReturnsCreated()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
         // Arrange
         var request = new CreateInvoiceRequest
         {
@@ -56,7 +41,7 @@ public class InvoiceCreationTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert
         if (!response.IsSuccessStatusCode)
@@ -75,7 +60,8 @@ public class InvoiceCreationTests : IAsyncLifetime
     [Fact]
     public async Task CreateInvoice_WithWithholdingTax_CalculatesCorrectly()
     {
-        // Arrange
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
         var request = new CreateInvoiceRequest
         {
             CustomerId = Guid.NewGuid(),
@@ -101,7 +87,7 @@ public class InvoiceCreationTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert
         if (!response.IsSuccessStatusCode)

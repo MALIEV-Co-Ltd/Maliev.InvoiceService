@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -9,33 +8,10 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Integration tests for currency conversion workflows
 /// T072, T149 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class CurrencyConversionTests : IAsyncLifetime
+public class CurrencyConversionTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public CurrencyConversionTests(TestDatabaseFixture dbFixture)
+    public CurrencyConversionTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-    }
-
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     #region T072 - Currency Conversion Workflow
@@ -43,6 +19,9 @@ public class CurrencyConversionTests : IAsyncLifetime
     [Fact]
     public async Task CreateInvoice_WithUSDCurrency_FetchesExchangeRateAndStoresIt()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange
         var request = new CreateInvoiceRequest
         {
@@ -61,7 +40,7 @@ public class CurrencyConversionTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -78,6 +57,9 @@ public class CurrencyConversionTests : IAsyncLifetime
     [Fact]
     public async Task CreateInvoice_WithTHBCurrency_DoesNotFetchExchangeRate()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange
         var request = new CreateInvoiceRequest
         {
@@ -96,7 +78,7 @@ public class CurrencyConversionTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -115,6 +97,9 @@ public class CurrencyConversionTests : IAsyncLifetime
     [Fact]
     public async Task CreateInvoice_WithUSDWhenCurrencyServiceUnavailable_CreatesInvoiceWithoutExchangeRate()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - This test assumes Currency Service is mocked to return null/fail
         var request = new CreateInvoiceRequest
         {
@@ -133,7 +118,7 @@ public class CurrencyConversionTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert - Should still create invoice even if exchange rate fetch fails
         response.EnsureSuccessStatusCode();

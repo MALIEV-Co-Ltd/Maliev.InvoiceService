@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 using System.Text.RegularExpressions;
 
 namespace Maliev.InvoiceService.Tests.Contract;
@@ -12,40 +11,20 @@ namespace Maliev.InvoiceService.Tests.Contract;
 /// Contract tests verify API endpoint contracts (HTTP methods, status codes, response shapes)
 /// These tests define the API surface and MUST be written FIRST per TDD principles
 /// </summary>
-[Collection("Database Collection")]
-public class InvoiceEndpointsTests : IAsyncLifetime
+public class InvoiceEndpointsTests : BaseContractTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public InvoiceEndpointsTests(TestDatabaseFixture dbFixture)
+    public InvoiceEndpointsTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
     }
 
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
-    }
-
-    #region T068 - POST /invoices/v1/invoices (create from quotation)
+    #region T068 - POST /invoice/v1/invoices (create from quotation)
 
     [Fact]
     public async Task POST_Invoices_WithQuotationReference_Returns201Created_WithLocationHeader()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange
         var request = new CreateInvoiceRequest
         {
@@ -65,12 +44,12 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
-        Assert.Contains("/invoices/v1/invoices/", response.Headers.Location!.PathAndQuery);
+        Assert.Contains("/invoice/v1/invoices/", response.Headers.Location!.PathAndQuery);
 
         var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
         Assert.NotNull(invoice);
@@ -81,11 +60,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T069 - POST /invoices/v1/invoices/{id}/finalize
+    #region T069 - POST /invoice/v1/invoices/{id}/finalize
 
     [Fact]
     public async Task POST_InvoicesFinalize_WithDraftInvoice_Returns200OK_WithSequentialInvoiceNumber()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice first
         var createRequest = new CreateInvoiceRequest
         {
@@ -102,12 +84,12 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act
         var finalizeRequest = new FinalizeInvoiceRequest { FinalizedBy = "test-user" };
-        var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", finalizeRequest);
+        var response = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize", finalizeRequest);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -123,11 +105,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T070 - GET /invoices/v1/invoices/{id}
+    #region T070 - GET /invoice/v1/invoices/{id}
 
     [Fact]
     public async Task GET_InvoicesById_WithExistingId_Returns200OK_WithFullInvoiceDetails()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create invoice first
         var createRequest = new CreateInvoiceRequest
         {
@@ -144,11 +129,11 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var created = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/invoices/{created!.Id}");
+        var response = await Client.GetAsync($"/invoice/v1/invoices/{created!.Id}");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -165,8 +150,11 @@ public class InvoiceEndpointsTests : IAsyncLifetime
     [Fact]
     public async Task GET_InvoicesById_WithNonExistentId_Returns404NotFound()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/invoices/{Guid.NewGuid()}");
+        var response = await Client.GetAsync($"/invoice/v1/invoices/{Guid.NewGuid()}");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -174,11 +162,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T097 - POST /invoices/v1/invoices (create manual invoice)
+    #region T097 - POST /invoice/v1/invoices (create manual invoice)
 
     [Fact]
     public async Task POST_Invoices_WithoutQuotationReference_Returns201Created()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange
         var request = new CreateInvoiceRequest
         {
@@ -198,7 +189,7 @@ public class InvoiceEndpointsTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -212,11 +203,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T105 - POST /invoices/v1/invoices/{id}/split
+    #region T105 - POST /invoice/v1/invoices/{id}/split
 
     [Fact]
     public async Task POST_InvoicesSplit_WithValidPercentages_Returns201Created_WithChildInvoices()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -233,9 +227,9 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 10, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act
         var splitRequest = new SplitInvoiceRequest
@@ -246,7 +240,7 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { Percentage = 60m }
             }
         };
-        var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/split", splitRequest);
+        var response = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft.Id}/split", splitRequest);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -261,6 +255,9 @@ public class InvoiceEndpointsTests : IAsyncLifetime
     [Fact]
     public async Task POST_InvoicesSplit_WithInvalidPercentages_Returns400BadRequest()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -277,9 +274,9 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act
         var splitRequest = new SplitInvoiceRequest
@@ -290,7 +287,7 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { Percentage = 50m } // Only 90%
             }
         };
-        var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/split", splitRequest);
+        var response = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft.Id}/split", splitRequest);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -298,11 +295,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T117 - GET /invoices/v1/invoices (with query parameters)
+    #region T117 - GET /invoice/v1/invoices (with query parameters)
 
     [Fact]
     public async Task GET_Invoices_WithQueryParameters_Returns200OK_WithPaginatedResults()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create some invoices
         for (int i = 0; i < 3; i++)
         {
@@ -321,11 +321,11 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                     new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
                 }
             };
-            await _client.PostAsJsonAsync("/invoices/v1/invoices", request);
+            await Client.PostAsJsonAsync("/invoice/v1/invoices", request);
         }
 
         // Act
-        var response = await _client.GetAsync("/invoices/v1/invoices?page=1&pageSize=2&status=Draft");
+        var response = await Client.GetAsync("/invoice/v1/invoices?page=1&pageSize=2&status=Draft");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -341,11 +341,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T141 - POST /invoices/v1/invoices/{id}/cancel
+    #region T141 - POST /invoice/v1/invoices/{id}/cancel
 
     [Fact]
     public async Task POST_InvoicesCancel_WithFinalizedInvoice_Returns200OK_WithCancelledStatus()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -362,9 +365,9 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act
         var cancelRequest = new CancelInvoiceRequest
@@ -372,7 +375,7 @@ public class InvoiceEndpointsTests : IAsyncLifetime
             CancelledBy = "admin-user",
             CancellationReason = "Customer requested cancellation"
         };
-        var response = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/cancel", cancelRequest);
+        var response = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft.Id}/cancel", cancelRequest);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -387,11 +390,14 @@ public class InvoiceEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T175 - GET /invoices/v1/invoices/{id} (PDF field verification)
+    #region T175 - GET /invoice/v1/invoices/{id} (PDF field verification)
 
     [Fact]
     public async Task GET_InvoicesById_FinalizedInvoice_ContainsAllPDFRequiredFields()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -419,12 +425,12 @@ public class InvoiceEndpointsTests : IAsyncLifetime
                 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize", new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/invoices/{draft.Id}");
+        var response = await Client.GetAsync($"/invoice/v1/invoices/{draft.Id}");
 
         // Assert - Contract verification for PDF generation
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

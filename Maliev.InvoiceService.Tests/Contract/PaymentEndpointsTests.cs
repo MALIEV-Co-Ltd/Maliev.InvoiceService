@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Contract;
 
@@ -11,41 +10,19 @@ namespace Maliev.InvoiceService.Tests.Contract;
 /// Contract tests for Payment endpoints
 /// T157, T158 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class PaymentEndpointsTests : IAsyncLifetime
+public class PaymentEndpointsTests : BaseContractTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public PaymentEndpointsTests(TestDatabaseFixture dbFixture)
+    public PaymentEndpointsTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
     }
 
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
-    }
-
-    #region T157 - POST /invoices/v1/payments
+    #region T157 - POST /invoice/v1/payments
 
     [Fact]
     public async Task POST_Payments_WithValidData_Returns201Created_WithLocationHeader()
     {
-        // Arrange
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
         var request = new CreatePaymentRequest
         {
             PaymentAmount = 5000m,
@@ -57,12 +34,12 @@ public class PaymentEndpointsTests : IAsyncLifetime
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/invoices/v1/payments", request);
+        var response = await Client.PostAsJsonAsync("/invoice/v1/payments", request);
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
-        Assert.Contains("/invoices/v1/payments/", response.Headers.Location!.PathAndQuery);
+        Assert.Contains("/invoice/v1/payments/", response.Headers.Location!.PathAndQuery);
 
         var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>();
         Assert.NotNull(payment);
@@ -75,12 +52,15 @@ public class PaymentEndpointsTests : IAsyncLifetime
 
     #endregion
 
-    #region T158 - GET /invoices/v1/payments/{id}
+    #region T158 - GET /invoice/v1/payments/{id}
 
     [Fact]
     public async Task GET_PaymentsById_WithExistingId_Returns200OK_WithPaymentDetails()
     {
-        // Arrange - Create payment first
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
+        // Create payment first
         var createRequest = new CreatePaymentRequest
         {
             PaymentAmount = 3000m,
@@ -89,11 +69,11 @@ public class PaymentEndpointsTests : IAsyncLifetime
             ReferenceNumber = "CASH-001",
             RecordedBy = "cashier-2"
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/payments", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/payments", createRequest);
         var created = await createResponse.Content.ReadFromJsonAsync<PaymentResponse>();
 
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/payments/{created!.Id}");
+        var response = await Client.GetAsync($"/invoice/v1/payments/{created!.Id}");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -108,8 +88,11 @@ public class PaymentEndpointsTests : IAsyncLifetime
     [Fact]
     public async Task GET_PaymentsById_WithNonExistentId_Returns404NotFound()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Act
-        var response = await _client.GetAsync($"/invoices/v1/payments/{Guid.NewGuid()}");
+        var response = await Client.GetAsync($"/invoice/v1/payments/{Guid.NewGuid()}");
 
         // Assert - Contract verification
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

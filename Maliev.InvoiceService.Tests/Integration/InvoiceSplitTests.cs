@@ -5,32 +5,18 @@ using System.Net.Http.Json;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
-[Collection("Database Collection")]
-public class InvoiceSplitTests : IAsyncLifetime
+public class InvoiceSplitTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
-    public InvoiceSplitTests(TestDatabaseFixture dbFixture)
+    public InvoiceSplitTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-        _client = _factory.CreateClient();
-    }
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     [Fact]
     public async Task SplitInvoice_Into50_50_CreatesProportionalInvoices()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var invoiceId = await CreateAndFinalizeInvoiceAsync();
 
@@ -44,7 +30,7 @@ public class InvoiceSplitTests : IAsyncLifetime
             }
         };
 
-        var splitResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoiceId}/split", splitRequest);
+        var splitResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoiceId}/split", splitRequest);
 
         // Assert
         if (!splitResponse.IsSuccessStatusCode)
@@ -72,7 +58,9 @@ public class InvoiceSplitTests : IAsyncLifetime
     [Fact]
     public async Task SplitInvoice_Into70_30_CreatesCorrectProportions()
     {
-        // Arrange
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         var invoiceId = await CreateAndFinalizeInvoiceAsync();
 
         // Act
@@ -85,7 +73,7 @@ public class InvoiceSplitTests : IAsyncLifetime
             }
         };
 
-        var splitResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoiceId}/split", splitRequest);
+        var splitResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoiceId}/split", splitRequest);
 
         // Assert
         splitResponse.EnsureSuccessStatusCode();
@@ -105,7 +93,9 @@ public class InvoiceSplitTests : IAsyncLifetime
     [Fact]
     public async Task SplitInvoice_WithInvalidPercentages_ReturnsBadRequest()
     {
-        // Arrange
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         var invoiceId = await CreateAndFinalizeInvoiceAsync();
 
         // Act - Try to split with percentages that don't sum to 100
@@ -118,7 +108,7 @@ public class InvoiceSplitTests : IAsyncLifetime
             }
         };
 
-        var splitResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoiceId}/split", splitRequest);
+        var splitResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoiceId}/split", splitRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, splitResponse.StatusCode);
@@ -127,6 +117,9 @@ public class InvoiceSplitTests : IAsyncLifetime
     [Fact]
     public async Task SplitInvoice_DraftInvoice_ReturnsConflict()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice (don't finalize)
         var createRequest = new CreateInvoiceRequest
         {
@@ -144,7 +137,7 @@ public class InvoiceSplitTests : IAsyncLifetime
             }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Try to split draft invoice
@@ -157,7 +150,7 @@ public class InvoiceSplitTests : IAsyncLifetime
             }
         };
 
-        var splitResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/split", splitRequest);
+        var splitResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/split", splitRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Conflict, splitResponse.StatusCode);
@@ -188,10 +181,10 @@ public class InvoiceSplitTests : IAsyncLifetime
             }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        var finalizeResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize",
+        var finalizeResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
         var finalized = await finalizeResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 

@@ -6,32 +6,18 @@ using System.Text.RegularExpressions;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
-[Collection("Database Collection")]
-public class InvoiceFinalizationTests : IAsyncLifetime
+public class InvoiceFinalizationTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
-    public InvoiceFinalizationTests(TestDatabaseFixture dbFixture)
+    public InvoiceFinalizationTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-        _client = _factory.CreateClient();
-    }
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     [Fact]
     public async Task FinalizeInvoice_WithValidDraftInvoice_AssignsSequentialNumber()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -56,13 +42,13 @@ public class InvoiceFinalizationTests : IAsyncLifetime
             }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         createResponse.EnsureSuccessStatusCode();
         var draftInvoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Finalize invoice
         var finalizeRequest = new FinalizeInvoiceRequest { FinalizedBy = "test-user" };
-        var finalizeResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draftInvoice!.Id}/finalize", finalizeRequest);
+        var finalizeResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draftInvoice!.Id}/finalize", finalizeRequest);
 
         // Assert
         if (!finalizeResponse.IsSuccessStatusCode)
@@ -84,6 +70,9 @@ public class InvoiceFinalizationTests : IAsyncLifetime
     [Fact]
     public async Task FinalizeInvoice_SecondInvoice_HasIncrementedSequenceNumber()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize first invoice
         var request1 = new CreateInvoiceRequest
         {
@@ -101,10 +90,10 @@ public class InvoiceFinalizationTests : IAsyncLifetime
             }
         };
 
-        var response1 = await _client.PostAsJsonAsync("/invoices/v1/invoices", request1);
+        var response1 = await Client.PostAsJsonAsync("/invoice/v1/invoices", request1);
         var draft1 = await response1.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        var finalizeResponse1 = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft1!.Id}/finalize",
+        var finalizeResponse1 = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft1!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "user1" });
         var finalized1 = await finalizeResponse1.Content.ReadFromJsonAsync<InvoiceResponse>();
 
@@ -125,11 +114,11 @@ public class InvoiceFinalizationTests : IAsyncLifetime
             }
         };
 
-        var response2 = await _client.PostAsJsonAsync("/invoices/v1/invoices", request2);
+        var response2 = await Client.PostAsJsonAsync("/invoice/v1/invoices", request2);
         var draft2 = await response2.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act
-        var finalizeResponse2 = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft2!.Id}/finalize",
+        var finalizeResponse2 = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft2!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "user2" });
 
         // Assert
@@ -149,6 +138,9 @@ public class InvoiceFinalizationTests : IAsyncLifetime
     [Fact]
     public async Task FinalizeInvoice_AlreadyFinalized_ReturnsConflict()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -166,14 +158,14 @@ public class InvoiceFinalizationTests : IAsyncLifetime
             }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         var finalizeRequest = new FinalizeInvoiceRequest { FinalizedBy = "user1" };
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize", finalizeRequest);
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize", finalizeRequest);
 
         // Act - Try to finalize again
-        var secondFinalizeResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft.Id}/finalize", finalizeRequest);
+        var secondFinalizeResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft.Id}/finalize", finalizeRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.Conflict, secondFinalizeResponse.StatusCode);

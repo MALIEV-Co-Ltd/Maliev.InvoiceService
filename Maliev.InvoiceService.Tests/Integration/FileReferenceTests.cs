@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -9,33 +8,10 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Integration tests for file reference registration (PDF generation support)
 /// T176 per tasks.md
 /// </summary>
-[Collection("Database Collection")]
-public class FileReferenceTests : IAsyncLifetime
+public class FileReferenceTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private HttpClient _client = null!;
-
-    public FileReferenceTests(TestDatabaseFixture dbFixture)
+    public FileReferenceTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-    }
-
-    public Task InitializeAsync()
-    {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            BaseAddress = new Uri("http://localhost")
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     #region T176 - File Reference Registration
@@ -43,6 +19,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterFileReference_ForFinalizedInvoice_StoresFileMetadata()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -59,10 +38,10 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act - Register file reference (simulates PDF generation)
@@ -74,7 +53,7 @@ public class FileReferenceTests : IAsyncLifetime
             GeneratedBy = "pdf-service",
             Checksum = "sha256:abcdef123456"
         };
-        var fileResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}/files", fileRequest);
+        var fileResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}/files", fileRequest);
 
         // Assert
         fileResponse.EnsureSuccessStatusCode();
@@ -94,6 +73,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task GetFileReferences_ForInvoiceWithMultipleFiles_ReturnsAllFiles()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create finalized invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -110,14 +92,14 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Register PDF file
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}/files", new RegisterFileRequest
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}/files", new RegisterFileRequest
         {
             FileType = "PDF",
             FileUrl = "https://storage.example.com/invoices/invoice.pdf",
@@ -126,7 +108,7 @@ public class FileReferenceTests : IAsyncLifetime
         });
 
         // Register XML file (e-Invoice)
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}/files", new RegisterFileRequest
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}/files", new RegisterFileRequest
         {
             FileType = "XML",
             FileUrl = "https://storage.example.com/invoices/invoice.xml",
@@ -135,7 +117,7 @@ public class FileReferenceTests : IAsyncLifetime
         });
 
         // Act - Get all file references
-        var getResponse = await _client.GetAsync($"/invoices/v1/invoices/{invoice.Id}/files");
+        var getResponse = await Client.GetAsync($"/invoice/v1/invoices/{invoice.Id}/files");
 
         // Assert
         getResponse.EnsureSuccessStatusCode();
@@ -150,6 +132,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterFileReference_ForDraftInvoice_Fails()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice (not finalized)
         var createRequest = new CreateInvoiceRequest
         {
@@ -166,7 +151,7 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Try to register file for draft invoice
@@ -177,7 +162,7 @@ public class FileReferenceTests : IAsyncLifetime
             FileSizeBytes = 10000,
             GeneratedBy = "pdf-service"
         };
-        var fileResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/files", fileRequest);
+        var fileResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/files", fileRequest);
 
         // Assert - Should fail (only finalized invoices can have files registered)
         Assert.Equal(System.Net.HttpStatusCode.Conflict, fileResponse.StatusCode);
@@ -190,6 +175,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterPdfFileReference_ForFinalizedInvoice_UpdatesPdfFileReferenceField()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -206,10 +194,10 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act - Upload Service registers PDF file reference via PATCH endpoint
@@ -217,15 +205,15 @@ public class FileReferenceTests : IAsyncLifetime
         {
             PdfFileReference = "https://storage.googleapis.com/maliev-invoices/INV-20250112-000001.pdf"
         };
-        var patchResponse = await _client.PatchAsJsonAsync(
-            $"/invoices/v1/invoices/{invoice.Id}/pdf-reference",
+        var patchResponse = await Client.PatchAsJsonAsync(
+            $"/invoice/v1/invoices/{invoice.Id}/pdf-reference",
             pdfReferenceRequest);
 
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.NoContent, patchResponse.StatusCode);
 
         // Verify pdf_file_reference field is updated
-        var getResponse = await _client.GetAsync($"/invoices/v1/invoices/{invoice.Id}");
+        var getResponse = await Client.GetAsync($"/invoice/v1/invoices/{invoice.Id}");
         var updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         Assert.NotNull(updatedInvoice);
@@ -235,6 +223,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterPdfFileReference_ForDraftInvoice_ReturnsBadRequest()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create draft invoice (not finalized)
         var createRequest = new CreateInvoiceRequest
         {
@@ -251,7 +242,7 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Try to register PDF reference for draft invoice
@@ -259,8 +250,8 @@ public class FileReferenceTests : IAsyncLifetime
         {
             PdfFileReference = "https://storage.googleapis.com/maliev-invoices/draft.pdf"
         };
-        var patchResponse = await _client.PatchAsJsonAsync(
-            $"/invoices/v1/invoices/{draft!.Id}/pdf-reference",
+        var patchResponse = await Client.PatchAsJsonAsync(
+            $"/invoice/v1/invoices/{draft!.Id}/pdf-reference",
             pdfReferenceRequest);
 
         // Assert - Should fail with BadRequest (business rule: only finalized invoices)
@@ -273,6 +264,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterPdfFileReference_ForNonExistentInvoice_ReturnsNotFound()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Use non-existent invoice ID
         var nonExistentId = Guid.NewGuid();
 
@@ -281,8 +275,8 @@ public class FileReferenceTests : IAsyncLifetime
         {
             PdfFileReference = "https://storage.googleapis.com/maliev-invoices/nonexistent.pdf"
         };
-        var patchResponse = await _client.PatchAsJsonAsync(
-            $"/invoices/v1/invoices/{nonExistentId}/pdf-reference",
+        var patchResponse = await Client.PatchAsJsonAsync(
+            $"/invoice/v1/invoices/{nonExistentId}/pdf-reference",
             pdfReferenceRequest);
 
         // Assert
@@ -292,6 +286,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterPdfFileReference_InvalidatesCacheAndCreatesAuditLog()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -308,24 +305,24 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // First GET to populate cache
-        await _client.GetAsync($"/invoices/v1/invoices/{invoice.Id}");
+        await Client.GetAsync($"/invoice/v1/invoices/{invoice.Id}");
 
         // Act - Register PDF file reference
         var pdfReferenceRequest = new RegisterPdfFileReferenceRequest
         {
             PdfFileReference = "https://storage.googleapis.com/maliev-invoices/cached-test.pdf"
         };
-        await _client.PatchAsJsonAsync($"/invoices/v1/invoices/{invoice.Id}/pdf-reference", pdfReferenceRequest);
+        await Client.PatchAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}/pdf-reference", pdfReferenceRequest);
 
         // Assert - Subsequent GET should return updated data (cache invalidated)
-        var getResponse = await _client.GetAsync($"/invoices/v1/invoices/{invoice.Id}");
+        var getResponse = await Client.GetAsync($"/invoice/v1/invoices/{invoice.Id}");
         var updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         Assert.Equal("https://storage.googleapis.com/maliev-invoices/cached-test.pdf", updatedInvoice!.PdfFileReference);
@@ -338,6 +335,9 @@ public class FileReferenceTests : IAsyncLifetime
     [Fact]
     public async Task RegisterPdfFileReference_WithInvalidRequest_ReturnsBadRequest()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var createRequest = new CreateInvoiceRequest
         {
@@ -354,16 +354,16 @@ public class FileReferenceTests : IAsyncLifetime
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        await _client.PostAsJsonAsync($"/invoices/v1/invoices/{invoice!.Id}/finalize",
+        await Client.PostAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
 
         // Act - Send invalid request (empty PdfFileReference)
         var invalidRequest = new { PdfFileReference = "" };
-        var patchResponse = await _client.PatchAsJsonAsync(
-            $"/invoices/v1/invoices/{invoice.Id}/pdf-reference",
+        var patchResponse = await Client.PatchAsJsonAsync(
+            $"/invoice/v1/invoices/{invoice.Id}/pdf-reference",
             invalidRequest);
 
         // Assert

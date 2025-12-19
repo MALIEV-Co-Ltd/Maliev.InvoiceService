@@ -6,32 +6,18 @@ using System.Net.Http.Json;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
-[Collection("Database Collection")]
-public class PaymentLinkingTests : IAsyncLifetime
+public class PaymentLinkingTests : BaseIntegrationTest
 {
-    private readonly TestDatabaseFixture _dbFixture;
-    private readonly TestWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
-    public PaymentLinkingTests(TestDatabaseFixture dbFixture)
+    public PaymentLinkingTests(TestWebApplicationFactory factory) : base(factory)
     {
-        _dbFixture = dbFixture;
-        _factory = new TestWebApplicationFactory(_dbFixture);
-        _client = _factory.CreateClient();
-    }
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
-    {
-        await _dbFixture.ClearDatabaseAsync();
-        _client.Dispose();
-        await _factory.DisposeAsync();
     }
 
     [Fact]
     public async Task LinkPayment_ToFinalizedInvoice_UpdatesStatusToPartiallyPaid()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var invoiceId = await CreateAndFinalizeInvoiceAsync(grandTotal: 1070m);
 
@@ -43,7 +29,7 @@ public class PaymentLinkingTests : IAsyncLifetime
             PaymentMethod = "Bank Transfer",
             RecordedBy = "cashier"
         };
-        var paymentResponse = await _client.PostAsJsonAsync("/invoices/v1/payments", paymentRequest);
+        var paymentResponse = await Client.PostAsJsonAsync("/invoice/v1/payments", paymentRequest);
         var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentResponse>();
 
         // Act - Link partial payment to invoice
@@ -52,7 +38,7 @@ public class PaymentLinkingTests : IAsyncLifetime
             PaymentId = payment!.Id,
             AllocatedAmount = 500m
         };
-        var linkResponse = await _client.PostAsJsonAsync($"/invoices/v1/payments/invoices/{invoiceId}/link", linkRequest);
+        var linkResponse = await Client.PostAsJsonAsync($"/invoice/v1/payments/invoices/{invoiceId}/link", linkRequest);
 
         // Assert
         if (!linkResponse.IsSuccessStatusCode)
@@ -70,6 +56,9 @@ public class PaymentLinkingTests : IAsyncLifetime
     [Fact]
     public async Task LinkPayment_FullAmount_UpdatesStatusToPaid()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var invoiceId = await CreateAndFinalizeInvoiceAsync(grandTotal: 1070m);
 
@@ -81,7 +70,7 @@ public class PaymentLinkingTests : IAsyncLifetime
             PaymentMethod = "Cash",
             RecordedBy = "cashier"
         };
-        var paymentResponse = await _client.PostAsJsonAsync("/invoices/v1/payments", paymentRequest);
+        var paymentResponse = await Client.PostAsJsonAsync("/invoice/v1/payments", paymentRequest);
         var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentResponse>();
 
         // Act - Link full payment
@@ -90,7 +79,7 @@ public class PaymentLinkingTests : IAsyncLifetime
             PaymentId = payment!.Id,
             AllocatedAmount = 1070m
         };
-        var linkResponse = await _client.PostAsJsonAsync($"/invoices/v1/payments/invoices/{invoiceId}/link", linkRequest);
+        var linkResponse = await Client.PostAsJsonAsync($"/invoice/v1/payments/invoices/{invoiceId}/link", linkRequest);
 
         // Assert
         linkResponse.EnsureSuccessStatusCode();
@@ -103,11 +92,14 @@ public class PaymentLinkingTests : IAsyncLifetime
     [Fact]
     public async Task LinkMultiplePayments_TotalingFullAmount_UpdatesStatusToPaid()
     {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
         // Arrange - Create and finalize invoice
         var invoiceId = await CreateAndFinalizeInvoiceAsync(grandTotal: 1000m);
 
         // Create first payment
-        var payment1Response = await _client.PostAsJsonAsync("/invoices/v1/payments", new CreatePaymentRequest
+        var payment1Response = await Client.PostAsJsonAsync("/invoice/v1/payments", new CreatePaymentRequest
         {
             PaymentAmount = 600m,
             PaymentDate = DateTime.UtcNow,
@@ -117,14 +109,14 @@ public class PaymentLinkingTests : IAsyncLifetime
         var payment1 = await payment1Response.Content.ReadFromJsonAsync<PaymentResponse>();
 
         // Link first payment
-        await _client.PostAsJsonAsync($"/invoices/v1/payments/invoices/{invoiceId}/link", new LinkPaymentRequest
+        await Client.PostAsJsonAsync($"/invoice/v1/payments/invoices/{invoiceId}/link", new LinkPaymentRequest
         {
             PaymentId = payment1!.Id,
             AllocatedAmount = 600m
         });
 
         // Create second payment
-        var payment2Response = await _client.PostAsJsonAsync("/invoices/v1/payments", new CreatePaymentRequest
+        var payment2Response = await Client.PostAsJsonAsync("/invoice/v1/payments", new CreatePaymentRequest
         {
             PaymentAmount = 400m,
             PaymentDate = DateTime.UtcNow,
@@ -134,7 +126,7 @@ public class PaymentLinkingTests : IAsyncLifetime
         var payment2 = await payment2Response.Content.ReadFromJsonAsync<PaymentResponse>();
 
         // Act - Link second payment
-        var linkResponse = await _client.PostAsJsonAsync($"/invoices/v1/payments/invoices/{invoiceId}/link", new LinkPaymentRequest
+        var linkResponse = await Client.PostAsJsonAsync($"/invoice/v1/payments/invoices/{invoiceId}/link", new LinkPaymentRequest
         {
             PaymentId = payment2!.Id,
             AllocatedAmount = 400m
@@ -173,7 +165,7 @@ public class PaymentLinkingTests : IAsyncLifetime
             }
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/invoices/v1/invoices", createRequest);
+        var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         if (!createResponse.IsSuccessStatusCode)
         {
             var error = await createResponse.Content.ReadAsStringAsync();
@@ -181,7 +173,7 @@ public class PaymentLinkingTests : IAsyncLifetime
         }
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        var finalizeResponse = await _client.PostAsJsonAsync($"/invoices/v1/invoices/{draft!.Id}/finalize",
+        var finalizeResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/finalize",
             new FinalizeInvoiceRequest { FinalizedBy = "test-user" });
         if (!finalizeResponse.IsSuccessStatusCode)
         {
