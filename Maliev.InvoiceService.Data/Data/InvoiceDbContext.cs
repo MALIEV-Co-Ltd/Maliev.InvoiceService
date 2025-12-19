@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Maliev.Aspire.ServiceDefaults.Database;
 using Maliev.InvoiceService.Data.Models;
 using Maliev.InvoiceService.Data.Configurations;
 using Maliev.InvoiceService.Data.Data.Interceptors;
@@ -41,6 +42,9 @@ public class InvoiceDbContext : DbContext
         modelBuilder.ApplyConfiguration(new InvoicePaymentAllocationConfiguration());
         modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
         modelBuilder.ApplyConfiguration(new FileReferenceConfiguration());
+
+        // Apply PostgreSQL snake_case naming convention globally
+        SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }
 
     /// <summary>
@@ -81,6 +85,7 @@ public class InvoiceDbContext : DbContext
                     entry.Property(i => i.RowVersion).CurrentValue = BitConverter.GetBytes(versionNumber);
                 }
                 // Don't modify OriginalValue - EF Core needs it for the WHERE clause
+        
             }
         }
 
