@@ -129,7 +129,7 @@ dotnet run --project Maliev.InvoiceService.Api
 
 **Create a draft invoice**:
 ```bash
-curl -X POST http://localhost:5000/invoices/v1/invoices \
+curl -X POST http://localhost:5000/invoice/v1/invoices \
   -H "Content-Type: application/json" \
   -d '{
     "customerId": "00000000-0000-0000-0000-000000000001",
@@ -155,12 +155,12 @@ curl -X POST http://localhost:5000/invoices/v1/invoices \
 
 **Finalize invoice** (assigns sequential invoice number):
 ```bash
-curl -X POST http://localhost:5000/invoices/v1/invoices/{id}/finalize
+curl -X POST http://localhost:5000/invoice/v1/invoices/{id}/finalize
 ```
 
 **Get paginated invoices**:
 ```bash
-curl http://localhost:5000/invoices/v1/invoices?page=1&pageSize=20&status=Draft
+curl http://localhost:5000/invoice/v1/invoices?page=1&pageSize=20&status=Draft
 ```
 
 ## Configuration
@@ -193,7 +193,7 @@ See `appsettings.Development.json` for localhost defaults.
    - Corrections must be made via credit notes/amendments (future feature)
 
 4. **API Versioning**:
-   - URL segment versioning (`/invoices/v1/...`)
+   - URL segment versioning (`/invoice/v1/...`)
    - Direct path prefixes (NO UsePathBase per MALIEV routing lessons)
 
 ## Testing

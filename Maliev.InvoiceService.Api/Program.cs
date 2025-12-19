@@ -1,7 +1,7 @@
 using Maliev.InvoiceService.Api.Middleware;
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Services.External;
-using Maliev.InvoiceService.Api.Services.HealthChecks;
+
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Data.Interceptors;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +13,7 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-builder.AddServiceMeters("invoices"); // Register service meters for OpenTelemetry business metrics
+builder.AddServiceMeters("invoices-meter"); // Register service meters for OpenTelemetry business metrics
 
 // Database Context with ServiceDefaults + custom interceptors
 builder.AddPostgresDbContext<InvoiceDbContext>(
@@ -27,7 +27,7 @@ builder.AddPostgresDbContext<InvoiceDbContext>(
         );
     });
 
-builder.AddRedisDistributedCache(instanceName: "InvoiceService:"); // Redis with in-memory fallback
+builder.AddRedisDistributedCache(instanceName: "invoice:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
 
 // --- API Configuration ---
@@ -36,6 +36,18 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
 // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
 builder.AddJwtAuthentication();
+
+// Authorization Policies
+builder.Services.AddAuthorization(options =>
+{
+    // Policy allowing any authenticated user (Employee role or higher)
+    options.AddPolicy("EmployeeOrHigher", policy =>
+        policy.RequireAuthenticatedUser());
+
+    // Policy requiring Manager or Admin role
+    options.AddPolicy("Manager", policy =>
+        policy.RequireRole("Manager", "manager", "admin"));
+});
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
@@ -103,10 +115,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map Aspire default endpoints (/health, /alive, /metrics)
-app.MapDefaultEndpoints(servicePrefix: "invoices");
+app.MapDefaultEndpoints(servicePrefix: "invoice");
 
 // Map OpenAPI and Scalar documentation (dev/staging only)
-app.MapApiDocumentation(servicePrefix: "invoices");
+app.MapApiDocumentation(servicePrefix: "invoice");
 
 Log.ServiceStarted(logger);
 await app.RunAsync();

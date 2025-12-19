@@ -12,7 +12,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("invoices/v{version:apiVersion}/payments")]
+[Route("invoice/v{version:apiVersion}/payments")]
 [Authorize(Policy = "EmployeeOrHigher")]
 public class PaymentsController : ControllerBase
 {

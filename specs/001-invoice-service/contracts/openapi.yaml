@@ -21,7 +21,7 @@ info:
     - Manager: Finalize and cancel invoices
     - Admin: Full access including audit logs
 
-    **Base Path**: `/invoices/v1`
+    **Base Path**: `/invoice/v1`
 
     **Scalar UI**: Available at `/invoices/scalar/v1` (development only)
   contact:
@@ -56,7 +56,7 @@ paths:
   # Invoice Endpoints
   # ========================================
 
-  /invoices/v1/invoices:
+  /invoice/v1/invoices:
     get:
       tags:
         - Invoices
@@ -120,7 +120,7 @@ paths:
               schema:
                 type: string
                 format: uri
-                example: /invoices/v1/invoices/123e4567-e89b-12d3-a456-426614174000
+                example: /invoice/v1/invoices/123e4567-e89b-12d3-a456-426614174000
           content:
             application/json:
               schema:
@@ -134,7 +134,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /invoices/v1/invoices/{id}:
+  /invoice/v1/invoices/{id}:
     get:
       tags:
         - Invoices
@@ -217,7 +217,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /invoices/v1/invoices/{id}/finalize:
+  /invoice/v1/invoices/{id}/finalize:
     post:
       tags:
         - Invoices
@@ -262,7 +262,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /invoices/v1/invoices/{id}/cancel:
+  /invoice/v1/invoices/{id}/cancel:
     post:
       tags:
         - Invoices
@@ -308,7 +308,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /invoices/v1/invoices/{id}/split:
+  /invoice/v1/invoices/{id}/split:
     post:
       tags:
         - Invoices
@@ -358,7 +358,7 @@ paths:
   # Payment Endpoints
   # ========================================
 
-  /invoices/v1/payments:
+  /invoice/v1/payments:
     get:
       tags:
         - Payments
@@ -412,7 +412,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /invoices/v1/payments/{id}:
+  /invoice/v1/payments/{id}:
     get:
       tags:
         - Payments
@@ -444,7 +444,7 @@ paths:
   # Audit Endpoints
   # ========================================
 
-  /invoices/v1/audit/invoices/{id}:
+  /invoice/v1/audit/invoices/{id}:
     get:
       tags:
         - Audit
@@ -1211,7 +1211,7 @@ components:
         instance:
           type: string
           description: Request URI
-          example: /invoices/v1/invoices
+          example: /invoice/v1/invoices
         traceId:
           type: string
           description: Correlation ID for tracing

@@ -12,7 +12,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("invoices/v{version:apiVersion}/invoices")]
+[Route("invoice/v{version:apiVersion}/invoices")]
 public class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;

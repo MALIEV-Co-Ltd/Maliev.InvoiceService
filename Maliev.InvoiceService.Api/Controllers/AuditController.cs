@@ -11,7 +11,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("invoices/v{version:apiVersion}/audit")]
+[Route("invoice/v{version:apiVersion}/audit")]
 [Authorize(Policy = "Manager")]
 public class AuditController : ControllerBase
 {
