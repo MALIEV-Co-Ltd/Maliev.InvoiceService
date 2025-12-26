@@ -4,7 +4,16 @@ Comprehensive microservice for managing invoices, quotations, payments, and audi
 
 ## Status
 
-**Current Implementation**: MVP Foundation Complete (Phases 1-3)
+**Current Implementation**: Permission-Based Authorization Migration Complete (002-iam-integration)
+
+### ✅ Phase 002-iam-integration - COMPLETE
+- ✅ 21 Fine-grained permission constants (invoice.*)
+- ✅ 5 Predefined roles (roles.invoice.*)
+- ✅ Automated IAM registration with fail-fast startup logic
+- ✅ Permission-based access control on all 4 controllers
+- ✅ Legacy role-to-permission mapping (backward compatibility)
+- ✅ Feature flag support (PermissionBasedAuthEnabled)
+- ✅ OpenAPI SecurityRequirement integration
 
 ### ✅ Phase 1: Setup (T001-T012) - COMPLETE
 - ✅ Three-project solution structure (Api, Data, Tests)
@@ -48,8 +57,17 @@ Comprehensive microservice for managing invoices, quotations, payments, and audi
 
 ## Architecture
 
+### Security & Authorization
+The service uses a fine-grained, permission-based authorization model integrated with a central IAM service.
+- **Permissions**: format `invoice.{resource}.{action}` (e.g., `invoice.invoices.create`)
+- **Roles**: format `roles.invoice.{role}` (e.g., `roles.invoice.manager`)
+- **Enforcement**: Via `[RequirePermission]` attribute on controller actions.
+- **Rollout**: Controlled by `Features:PermissionBasedAuthEnabled` flag.
+- **Compatibility**: Legacy roles in JWT tokens are automatically mapped to permissions via `IAMClaimsTransformation`.
+
 ### Technology Stack
 - **Framework**: .NET 10.0 with ASP.NET Core WebAPI
+- **IAM Integration**: Maliev.Aspire.ServiceDefaults.IAM
 - **Database**: PostgreSQL 18 with EF Core 9.0.10 (forward-compatible)
 - **Database Provider**: Npgsql 9.0.4 (stable, .NET 10 compatible)
 - **Caching**: Redis distributed cache with in-memory fallback

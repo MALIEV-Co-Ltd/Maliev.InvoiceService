@@ -1,4 +1,6 @@
 using Maliev.InvoiceService.Tests.Fixtures;
+using Maliev.InvoiceService.Tests.Testing;
+using Maliev.InvoiceService.Api.Authorization;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -14,7 +16,8 @@ public abstract class BaseIntegrationTest : IClassFixture<TestWebApplicationFact
     protected BaseIntegrationTest(TestWebApplicationFactory factory)
     {
         Factory = factory;
-        Client = Factory.CreateAuthenticatedClient("test-admin", new[] { "admin" });
+        // Use a client with all permissions for standard tests
+        Client = Factory.CreateClient().WithTestAuth(Factory, InvoicePermissions.All);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

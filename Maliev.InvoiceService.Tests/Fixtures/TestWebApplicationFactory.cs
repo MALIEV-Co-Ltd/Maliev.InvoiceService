@@ -3,11 +3,21 @@ using Maliev.InvoiceService.Api.Services.External;
 using Maliev.InvoiceService.Tests.Mocks;
 using Maliev.InvoiceService.Tests.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Moq;
+using Moq.Protected;
+using System.Net;
 
 namespace Maliev.InvoiceService.Tests.Fixtures;
 
 public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, InvoiceDbContext>
 {
+    protected override void ConfigureEnvironmentVariables()
+    {
+        base.ConfigureEnvironmentVariables();
+        Environment.SetEnvironmentVariable("Features__PermissionBasedAuthEnabled", "true");
+    }
+
     protected override void ConfigureAdditionalServices(IServiceCollection services)
     {
         // Replace the real Currency Service client with the mock
@@ -25,5 +35,23 @@ public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, Inv
             services.Remove(quotationDescriptor);
         }
         services.AddSingleton<IQuotationServiceClient, MockQuotationServiceClient>();
+
+        // Mock IAM registration service calls to prevent fail-fast startup errors
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>()
+            )
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent("{\"status\":\"success\"}")
+            });
+
+        services.AddHttpClient("IAMService")
+            .ConfigurePrimaryHttpMessageHandler(() => handlerMock.Object);
     }
 }

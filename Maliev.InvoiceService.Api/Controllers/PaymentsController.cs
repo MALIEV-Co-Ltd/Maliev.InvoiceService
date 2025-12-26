@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Api.Services;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.InvoiceService.Api.Authorization;
 
 namespace Maliev.InvoiceService.Api.Controllers;
 
@@ -13,7 +15,6 @@ namespace Maliev.InvoiceService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("invoice/v{version:apiVersion}/payments")]
-[Authorize(Policy = "EmployeeOrHigher")]
 public class PaymentsController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
@@ -38,6 +39,7 @@ public class PaymentsController : ControllerBase
     /// <returns>The created payment details.</returns>
     /// <response code="201">Payment created successfully.</response>
     [HttpPost]
+    [RequirePermission(InvoicePermissions.InvoicesUpdate)]
     [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status201Created)]
     public async Task<ActionResult<PaymentResponse>> CreatePayment([FromBody] CreatePaymentRequest request, CancellationToken cancellationToken)
     {
@@ -54,6 +56,7 @@ public class PaymentsController : ControllerBase
     /// <response code="200">Payment found and returned.</response>
     /// <response code="404">Payment not found.</response>
     [HttpGet("{id:guid}")]
+    [RequirePermission(InvoicePermissions.InvoicesRead)]
     [ProducesResponseType(typeof(PaymentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PaymentResponse>> GetPayment(Guid id, CancellationToken cancellationToken)
@@ -75,6 +78,7 @@ public class PaymentsController : ControllerBase
     /// <response code="200">Payment linked to invoice successfully.</response>
     /// <response code="404">Invoice or payment not found.</response>
     [HttpPost("invoices/{invoiceId:guid}/link")]
+    [RequirePermission(InvoicePermissions.InvoicesUpdate)]
     [ProducesResponseType(typeof(InvoiceResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> LinkPaymentToInvoice(Guid invoiceId, [FromBody] LinkPaymentRequest request, CancellationToken cancellationToken)

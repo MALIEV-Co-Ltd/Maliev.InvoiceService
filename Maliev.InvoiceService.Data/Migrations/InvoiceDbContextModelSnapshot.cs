@@ -17,7 +17,7 @@ namespace Maliev.InvoiceService.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -142,6 +142,53 @@ namespace Maliev.InvoiceService.Data.Migrations
                         .HasDatabaseName("idx_file_references_invoice_id");
 
                     b.ToTable("file_references", (string)null);
+                });
+
+            modelBuilder.Entity("Maliev.InvoiceService.Data.Models.IdempotencyKey", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Operation")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("operation");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("Response")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("response");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.HasKey("Key", "Operation")
+                        .HasName("pk_idempotency_keys");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("idx_idempotency_keys_expires_at");
+
+                    b.HasIndex("ResourceId")
+                        .HasDatabaseName("idx_idempotency_keys_resource_id");
+
+                    b.ToTable("idempotency_keys", (string)null);
                 });
 
             modelBuilder.Entity("Maliev.InvoiceService.Data.Models.Invoice", b =>

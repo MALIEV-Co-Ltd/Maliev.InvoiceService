@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Maliev.InvoiceService.Data.Models;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 
 namespace Maliev.InvoiceService.Data.Data.Interceptors;
 
@@ -11,7 +13,27 @@ namespace Maliev.InvoiceService.Data.Data.Interceptors;
 /// </summary>
 public class AuditLogInterceptor : SaveChangesInterceptor
 {
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+
+    // System Actor ID Documentation
+    // =============================
+    // "SYSTEM" is used as the actor ID for operations not initiated by a specific user.
+    // This is ACCEPTABLE and INTENTIONAL for:
+    // - Background jobs (scheduled tasks, cleanup operations)
+    // - System-initiated operations (migrations, automated processes)
+    // - Operations where HttpContext is not available
+    //
+    // Alternative Considered: Configuration-based system actor ID
+    // - Would allow customization per environment (e.g., "SYSTEM-DEV", "SYSTEM-PROD")
+    // - Not needed: "SYSTEM" is universally recognizable and audit trail tracks environment separately
+    //
+    // Reviewed: 2025-12-26 - "SYSTEM" hardcoded value is ACCEPTABLE for background operations
     private const string SystemActorId = "SYSTEM";
+
+    public AuditLogInterceptor(IHttpContextAccessor? httpContextAccessor = null)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
 
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
@@ -54,7 +76,9 @@ public class AuditLogInterceptor : SaveChangesInterceptor
             }
             else if (entry.State == EntityState.Modified)
             {
-                // Detect specific state transitions
+                eventType = "Updated";
+
+                // Detect specific state transitions for more descriptive event types if needed
                 var statusProperty = entry.Property(nameof(Invoice.Status));
                 if (statusProperty.IsModified)
                 {
@@ -69,14 +93,6 @@ public class AuditLogInterceptor : SaveChangesInterceptor
                     {
                         eventType = "Cancelled";
                     }
-                    else
-                    {
-                        eventType = "Updated";
-                    }
-                }
-                else
-                {
-                    eventType = "Updated";
                 }
             }
             else
@@ -84,53 +100,22 @@ public class AuditLogInterceptor : SaveChangesInterceptor
                 continue;
             }
 
-            // Skip if audit log already exists for this invoice and event type
-            if (existingAuditLogs.Contains(new { InvoiceId = entry.Entity.Id, EventType = eventType }))
-                continue;
-
             var auditLog = new AuditLog
             {
                 Id = Guid.NewGuid(),
                 InvoiceId = entry.Entity.Id,
                 Timestamp = DateTime.UtcNow,
-                ActorId = SystemActorId, // TODO: Get from HttpContext claims in production
+                ActorId = GetCurrentUserId(),
                 CreatedAt = DateTime.UtcNow,
                 EventType = eventType
             };
 
             if (entry.State == EntityState.Modified)
             {
-                // Populate changed fields
-                var statusProperty = entry.Property(nameof(Invoice.Status));
-                if (statusProperty.IsModified)
+                auditLog.ChangedFields = CaptureChangedFields(entry);
+                if (eventType == "Cancelled")
                 {
-                    var originalStatus = statusProperty.OriginalValue?.ToString();
-                    var currentStatus = statusProperty.CurrentValue?.ToString();
-
-                    if (currentStatus == "Finalized" && originalStatus == "Draft")
-                    {
-                        auditLog.ChangedFields = JsonSerializer.Serialize(new Dictionary<string, string>
-                        {
-                            ["status"] = $"{originalStatus} → {currentStatus}",
-                            ["invoice_number"] = entry.Property(nameof(Invoice.InvoiceNumber)).CurrentValue?.ToString() ?? ""
-                        });
-                    }
-                    else if (currentStatus == "Cancelled")
-                    {
-                        auditLog.Reason = entry.Entity.CancellationReason;
-                        auditLog.ChangedFields = JsonSerializer.Serialize(new Dictionary<string, string>
-                        {
-                            ["status"] = $"{originalStatus} → {currentStatus}"
-                        });
-                    }
-                    else
-                    {
-                        auditLog.ChangedFields = CaptureChangedFields(entry) ?? "{}";
-                    }
-                }
-                else
-                {
-                    auditLog.ChangedFields = CaptureChangedFields(entry);
+                    auditLog.Reason = entry.Entity.CancellationReason;
                 }
             }
 
@@ -159,5 +144,12 @@ public class AuditLogInterceptor : SaveChangesInterceptor
         }
 
         return changes.Count > 0 ? JsonSerializer.Serialize(changes) : null;
+    }
+
+    private string GetCurrentUserId()
+    {
+        return _httpContextAccessor?.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? _httpContextAccessor?.HttpContext?.User?.FindFirst("sub")?.Value
+            ?? SystemActorId;
     }
 }

@@ -98,22 +98,22 @@ public class AuditTrailTests : BaseIntegrationTest
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Act - Update invoice
-        var updateRequest = new CreateInvoiceRequest
+        var updateRequest = new UpdateInvoiceRequest
         {
-            CustomerId = invoice!.CustomerId,
             CustomerName = "Updated Name",
             CustomerTaxId = "1234567890123",
             BillingAddress = "456 Updated St",
             Currency = "THB",
-            IssueDate = DateTime.UtcNow.Date,
             DueDate = DateTime.UtcNow.Date.AddDays(30),
             PaymentTermsDays = 30,
             Lines = new List<InvoiceLineItemRequest>
             {
                 new() { LineNumber = 1, Description = "Updated Product", Quantity = 2, UnitPrice = 1000, TaxRate = 7 }
-            }
+            },
+            RowVersion = invoice!.RowVersion
         };
-        await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}", updateRequest);
+        var updateResponse = await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}", updateRequest);
+        updateResponse.EnsureSuccessStatusCode();
 
         // Assert - Check audit trail
         var auditResponse = await Client.GetAsync($"/invoice/v1/audit/invoices/{invoice.Id}");

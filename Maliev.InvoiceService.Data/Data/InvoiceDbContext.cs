@@ -12,6 +12,15 @@ namespace Maliev.InvoiceService.Data.Data;
 /// </summary>
 public class InvoiceDbContext : DbContext
 {
+    private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor? _httpContextAccessor;
+
+    public InvoiceDbContext(
+        DbContextOptions<InvoiceDbContext> options,
+        Microsoft.AspNetCore.Http.IHttpContextAccessor? httpContextAccessor = null) : base(options)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
+
     public InvoiceDbContext(DbContextOptions<InvoiceDbContext> options) : base(options)
     {
     }
@@ -22,13 +31,11 @@ public class InvoiceDbContext : DbContext
     public DbSet<InvoicePaymentAllocation> InvoicePaymentAllocations => Set<InvoicePaymentAllocation>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<FileReference> FileReferences => Set<FileReference>();
+    public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         base.OnConfiguring(optionsBuilder);
-
-        // Always add audit log interceptor for all environments (including tests)
-        optionsBuilder.AddInterceptors(new AuditLogInterceptor());
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -42,6 +49,7 @@ public class InvoiceDbContext : DbContext
         modelBuilder.ApplyConfiguration(new InvoicePaymentAllocationConfiguration());
         modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
         modelBuilder.ApplyConfiguration(new FileReferenceConfiguration());
+        modelBuilder.ApplyConfiguration(new IdempotencyKeyConfiguration());
 
         // Apply PostgreSQL snake_case naming convention globally
         SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
@@ -85,7 +93,7 @@ public class InvoiceDbContext : DbContext
                     entry.Property(i => i.RowVersion).CurrentValue = BitConverter.GetBytes(versionNumber);
                 }
                 // Don't modify OriginalValue - EF Core needs it for the WHERE clause
-        
+
             }
         }
 
