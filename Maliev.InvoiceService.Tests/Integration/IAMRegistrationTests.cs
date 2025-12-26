@@ -71,6 +71,9 @@ public class IAMRegistrationTests : IClassFixture<TestWebApplicationFactory>
         // Act - Accessing the client triggers host startup and the registration service
         await client.GetAsync("/invoice/v1/invoices");
 
+        // Wait for background service to trigger (it has a 2s initial delay)
+        await Task.Delay(5000);
+
         // Assert
         handlerMock.Protected().Verify(
             "SendAsync",
