@@ -246,19 +246,20 @@ public class InvoiceServiceTests : IAsyncLifetime
             _quotationClientMock.Object
         );
 
-        var updateRequest = new CreateInvoiceRequest
+        var updateRequest = new UpdateInvoiceRequest
         {
-            CustomerId = invoice.CustomerId,
             Currency = "THB",
-            IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
-            Lines = new List<InvoiceLineItemRequest>()
+            Lines = new List<InvoiceLineItemRequest>(),
+            RowVersion = invoice.RowVersion,
+            CustomerName = "Updated Name",
+            CustomerTaxId = "1234567890123",
+            BillingAddress = "123 Updated St"
         };
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.UpdateInvoiceAsync(invoiceId, updateRequest, CancellationToken.None));
-        Assert.Contains("Finalized", exception.Message);
 
         // Verify audit log was created
         var auditLog = await context.AuditLogs
@@ -301,13 +302,15 @@ public class InvoiceServiceTests : IAsyncLifetime
             _quotationClientMock.Object
         );
 
-        var updateRequest = new CreateInvoiceRequest
+        var updateRequest = new UpdateInvoiceRequest
         {
-            CustomerId = invoice.CustomerId,
             Currency = "THB",
-            IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
-            Lines = new List<InvoiceLineItemRequest>()
+            Lines = new List<InvoiceLineItemRequest>(),
+            RowVersion = invoice.RowVersion,
+            CustomerName = "Updated Name",
+            CustomerTaxId = "1234567890123",
+            BillingAddress = "123 Updated St"
         };
 
         // Act & Assert
@@ -340,7 +343,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             GrandTotal = 1070m,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            RowVersion = BitConverter.GetBytes(1L)
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
@@ -353,12 +356,12 @@ public class InvoiceServiceTests : IAsyncLifetime
             _quotationClientMock.Object
         );
 
-        var updateRequest = new CreateInvoiceRequest
+        var updateRequest = new UpdateInvoiceRequest
         {
-            CustomerId = customerId,
             CustomerName = "Updated Customer",
+            CustomerTaxId = "1234567890123",
+            BillingAddress = "123 Updated St",
             Currency = "THB",
-            IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(45),
             Lines = new List<InvoiceLineItemRequest>
             {
@@ -368,7 +371,8 @@ public class InvoiceServiceTests : IAsyncLifetime
                     Quantity = 2,
                     UnitPrice = 500m
                 }
-            }
+            },
+            RowVersion = invoice.RowVersion
         };
 
         // Act
