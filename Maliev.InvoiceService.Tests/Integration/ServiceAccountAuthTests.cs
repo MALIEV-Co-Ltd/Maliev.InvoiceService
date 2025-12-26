@@ -18,7 +18,7 @@ public class ServiceAccountAuthTests : BaseIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        
+
         // Create an invoice first using admin client
         var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", new CreateInvoiceRequest
         {
@@ -48,7 +48,7 @@ public class ServiceAccountAuthTests : BaseIntegrationTest
         var client = Factory.CreateClient().WithTestAuth(Factory, InvoicePermissions.FilesRegister);
 
         // Act
-        var response = await client.PatchAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/pdf-reference", 
+        var response = await client.PatchAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/pdf-reference",
             new RegisterPdfFileReferenceRequest { PdfFileReference = "files/invoice-pdf-123.pdf" });
 
         // Assert
@@ -60,7 +60,7 @@ public class ServiceAccountAuthTests : BaseIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        
+
         // Create an invoice first
         var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", new CreateInvoiceRequest
         {
@@ -86,7 +86,7 @@ public class ServiceAccountAuthTests : BaseIntegrationTest
         var client = Factory.CreateClient().WithTestAuth(Factory, InvoicePermissions.InvoicesRead);
 
         // Act
-        var response = await client.PatchAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/pdf-reference", 
+        var response = await client.PatchAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}/pdf-reference",
             new RegisterPdfFileReferenceRequest { PdfFileReference = "files/invoice-pdf-123.pdf" });
 
         // Assert

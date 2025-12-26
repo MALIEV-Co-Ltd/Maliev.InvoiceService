@@ -996,83 +996,83 @@ public class InvoiceService : IInvoiceService
                 var nextSeq = Convert.ToInt64(result);
 
                 var childInvoice = new Invoice
-            {
-                Id = Guid.NewGuid(),
-                ParentInvoiceId = parentInvoice.Id,
-                CustomerId = parentInvoice.CustomerId,
-                CustomerName = parentInvoice.CustomerName,
-                CustomerTaxId = parentInvoice.CustomerTaxId,
-                BillingAddress = parentInvoice.BillingAddress,
-                ShippingAddress = parentInvoice.ShippingAddress,
-                QuotationReference = parentInvoice.QuotationReference,
-                PoNumber = parentInvoice.PoNumber,
-                Currency = parentInvoice.Currency,
-                ExchangeRate = parentInvoice.ExchangeRate,
-                ExchangeRateSource = parentInvoice.ExchangeRateSource,
-                IssueDate = parentInvoice.IssueDate,
-                DueDate = parentInvoice.DueDate,
-                PaymentTermsDays = parentInvoice.PaymentTermsDays,
-                LateFeePercentage = parentInvoice.LateFeePercentage,
-                InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{nextSeq:D6}",
-                Status = "Finalized",
-                FinalizedAt = DateTime.UtcNow,
-                FinalizedBy = "system-split",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                RowVersion = new byte[8]
-            };
-
-            var ratio = rule.Percentage / 100m;
-
-            // Split lines proportionally
-            foreach (var parentLine in parentInvoice.Lines)
-            {
-                var childLine = new InvoiceLine
                 {
                     Id = Guid.NewGuid(),
-                    InvoiceId = childInvoice.Id,
-                    LineNumber = parentLine.LineNumber,
-                    ItemCode = parentLine.ItemCode,
-                    Description = $"{parentLine.Description} (Split {rule.Percentage}%)",
-                    Quantity = Math.Round(parentLine.Quantity * ratio, 4),
-                    UnitPrice = parentLine.UnitPrice,
-                    DiscountPercentage = parentLine.DiscountPercentage,
-                    TaxCategory = parentLine.TaxCategory,
-                    TaxRate = parentLine.TaxRate,
-                    LineSubtotal = Math.Round(parentLine.LineSubtotal * ratio, 2),
-                    TaxAmount = Math.Round(parentLine.TaxAmount * ratio, 2),
-                    LineTotal = Math.Round(parentLine.LineTotal * ratio, 2),
+                    ParentInvoiceId = parentInvoice.Id,
+                    CustomerId = parentInvoice.CustomerId,
+                    CustomerName = parentInvoice.CustomerName,
+                    CustomerTaxId = parentInvoice.CustomerTaxId,
+                    BillingAddress = parentInvoice.BillingAddress,
+                    ShippingAddress = parentInvoice.ShippingAddress,
+                    QuotationReference = parentInvoice.QuotationReference,
+                    PoNumber = parentInvoice.PoNumber,
+                    Currency = parentInvoice.Currency,
+                    ExchangeRate = parentInvoice.ExchangeRate,
+                    ExchangeRateSource = parentInvoice.ExchangeRateSource,
+                    IssueDate = parentInvoice.IssueDate,
+                    DueDate = parentInvoice.DueDate,
+                    PaymentTermsDays = parentInvoice.PaymentTermsDays,
+                    LateFeePercentage = parentInvoice.LateFeePercentage,
+                    InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{nextSeq:D6}",
+                    Status = "Finalized",
+                    FinalizedAt = DateTime.UtcNow,
+                    FinalizedBy = "system-split",
                     CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    UpdatedAt = DateTime.UtcNow,
+                    RowVersion = new byte[8]
                 };
 
-                childInvoice.Lines.Add(childLine);
+                var ratio = rule.Percentage / 100m;
+
+                // Split lines proportionally
+                foreach (var parentLine in parentInvoice.Lines)
+                {
+                    var childLine = new InvoiceLine
+                    {
+                        Id = Guid.NewGuid(),
+                        InvoiceId = childInvoice.Id,
+                        LineNumber = parentLine.LineNumber,
+                        ItemCode = parentLine.ItemCode,
+                        Description = $"{parentLine.Description} (Split {rule.Percentage}%)",
+                        Quantity = Math.Round(parentLine.Quantity * ratio, 4),
+                        UnitPrice = parentLine.UnitPrice,
+                        DiscountPercentage = parentLine.DiscountPercentage,
+                        TaxCategory = parentLine.TaxCategory,
+                        TaxRate = parentLine.TaxRate,
+                        LineSubtotal = Math.Round(parentLine.LineSubtotal * ratio, 2),
+                        TaxAmount = Math.Round(parentLine.TaxAmount * ratio, 2),
+                        LineTotal = Math.Round(parentLine.LineTotal * ratio, 2),
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    childInvoice.Lines.Add(childLine);
+                }
+
+                childInvoice.Subtotal = childInvoice.Lines.Sum(l => l.LineSubtotal);
+                childInvoice.TaxAmount = childInvoice.Lines.Sum(l => l.TaxAmount);
+                childInvoice.WithholdingTaxAmount = Math.Round(parentInvoice.WithholdingTaxAmount * ratio, 2);
+                childInvoice.GrandTotal = childInvoice.Subtotal + childInvoice.TaxAmount - childInvoice.WithholdingTaxAmount;
+
+                childInvoices.Add(childInvoice);
             }
-
-            childInvoice.Subtotal = childInvoice.Lines.Sum(l => l.LineSubtotal);
-            childInvoice.TaxAmount = childInvoice.Lines.Sum(l => l.TaxAmount);
-            childInvoice.WithholdingTaxAmount = Math.Round(parentInvoice.WithholdingTaxAmount * ratio, 2);
-            childInvoice.GrandTotal = childInvoice.Subtotal + childInvoice.TaxAmount - childInvoice.WithholdingTaxAmount;
-
-            childInvoices.Add(childInvoice);
         }
-    }
-    finally
-    {
-        await _context.Database.CloseConnectionAsync();
-    }
+        finally
+        {
+            await _context.Database.CloseConnectionAsync();
+        }
 
-    // T112: Reconcile rounding errors by adjusting the last child invoice
-    if (childInvoices.Count > 0)
-    {
-        var lastChild = childInvoices.Last();
-        lastChild.Subtotal = parentInvoice.Subtotal - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.Subtotal);
-        lastChild.TaxAmount = parentInvoice.TaxAmount - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.TaxAmount);
-        lastChild.WithholdingTaxAmount = parentInvoice.WithholdingTaxAmount - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.WithholdingTaxAmount);
-        lastChild.GrandTotal = parentInvoice.GrandTotal - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.GrandTotal);
-    }
+        // T112: Reconcile rounding errors by adjusting the last child invoice
+        if (childInvoices.Count > 0)
+        {
+            var lastChild = childInvoices.Last();
+            lastChild.Subtotal = parentInvoice.Subtotal - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.Subtotal);
+            lastChild.TaxAmount = parentInvoice.TaxAmount - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.TaxAmount);
+            lastChild.WithholdingTaxAmount = parentInvoice.WithholdingTaxAmount - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.WithholdingTaxAmount);
+            lastChild.GrandTotal = parentInvoice.GrandTotal - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.GrandTotal);
+        }
 
-    _context.Invoices.AddRange(childInvoices);
+        _context.Invoices.AddRange(childInvoices);
         await _context.SaveChangesAsync(cancellationToken);
 
         // Record metrics

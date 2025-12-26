@@ -77,7 +77,7 @@ public class AuditLogInterceptor : SaveChangesInterceptor
             else if (entry.State == EntityState.Modified)
             {
                 eventType = "Updated";
-                
+
                 // Detect specific state transitions for more descriptive event types if needed
                 var statusProperty = entry.Property(nameof(Invoice.Status));
                 if (statusProperty.IsModified)
@@ -148,8 +148,8 @@ public class AuditLogInterceptor : SaveChangesInterceptor
 
     private string GetCurrentUserId()
     {
-        return _httpContextAccessor?.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-            ?? _httpContextAccessor?.HttpContext?.User?.FindFirst("sub")?.Value 
+        return _httpContextAccessor?.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? _httpContextAccessor?.HttpContext?.User?.FindFirst("sub")?.Value
             ?? SystemActorId;
     }
 }

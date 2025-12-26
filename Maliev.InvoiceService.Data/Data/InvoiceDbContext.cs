@@ -93,7 +93,7 @@ public class InvoiceDbContext : DbContext
                     entry.Property(i => i.RowVersion).CurrentValue = BitConverter.GetBytes(versionNumber);
                 }
                 // Don't modify OriginalValue - EF Core needs it for the WHERE clause
-        
+
             }
         }
 

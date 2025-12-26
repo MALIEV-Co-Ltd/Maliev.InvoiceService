@@ -23,15 +23,15 @@ public class IAMRegistrationTests : IClassFixture<TestWebApplicationFactory>
     {
         // Arrange
         var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        
+
         // Setup expected responses for permissions registration
         handlerMock
             .Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",
-                ItExpr.Is<HttpRequestMessage>(req => 
-                    req.Method == HttpMethod.Post && 
-                    req.RequestUri != null && 
+                ItExpr.Is<HttpRequestMessage>(req =>
+                    req.Method == HttpMethod.Post &&
+                    req.RequestUri != null &&
                     req.RequestUri.AbsolutePath.Contains("/iam/v1/permissions/register")),
                 ItExpr.IsAny<CancellationToken>()
             )
@@ -46,9 +46,9 @@ public class IAMRegistrationTests : IClassFixture<TestWebApplicationFactory>
             .Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",
-                ItExpr.Is<HttpRequestMessage>(req => 
-                    req.Method == HttpMethod.Post && 
-                    req.RequestUri != null && 
+                ItExpr.Is<HttpRequestMessage>(req =>
+                    req.Method == HttpMethod.Post &&
+                    req.RequestUri != null &&
                     req.RequestUri.AbsolutePath.Contains("/iam/v1/roles/register")),
                 ItExpr.IsAny<CancellationToken>()
             )
@@ -75,9 +75,9 @@ public class IAMRegistrationTests : IClassFixture<TestWebApplicationFactory>
         handlerMock.Protected().Verify(
             "SendAsync",
             Times.Once(),
-            ItExpr.Is<HttpRequestMessage>(req => 
-                req.Method == HttpMethod.Post && 
-                req.RequestUri != null && 
+            ItExpr.Is<HttpRequestMessage>(req =>
+                req.Method == HttpMethod.Post &&
+                req.RequestUri != null &&
                 req.RequestUri.AbsolutePath.Contains("/iam/v1/permissions/register")),
             ItExpr.IsAny<CancellationToken>()
         );
@@ -85,9 +85,9 @@ public class IAMRegistrationTests : IClassFixture<TestWebApplicationFactory>
         handlerMock.Protected().Verify(
             "SendAsync",
             Times.Once(),
-            ItExpr.Is<HttpRequestMessage>(req => 
-                req.Method == HttpMethod.Post && 
-                req.RequestUri != null && 
+            ItExpr.Is<HttpRequestMessage>(req =>
+                req.Method == HttpMethod.Post &&
+                req.RequestUri != null &&
                 req.RequestUri.AbsolutePath.Contains("/iam/v1/roles/register")),
             ItExpr.IsAny<CancellationToken>()
         );

@@ -87,7 +87,7 @@ public class IAMClaimsTransformation : IClaimsTransformation
 
         if (mappedPermissions.Any())
         {
-            _logger.LogInformation("Mapped legacy roles [{Roles}] to {Count} permissions", 
+            _logger.LogInformation("Mapped legacy roles [{Roles}] to {Count} permissions",
                 string.Join(", ", roles), mappedPermissions.Count);
         }
 

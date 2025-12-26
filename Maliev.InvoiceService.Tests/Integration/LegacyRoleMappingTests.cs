@@ -26,7 +26,7 @@ public class LegacyRoleMappingTests : BaseIntegrationTest
 
         // Arrange
         await CleanDatabaseAsync();
-        
+
         // Create an invoice first
         var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", new CreateInvoiceRequest
         {
@@ -53,7 +53,7 @@ public class LegacyRoleMappingTests : BaseIntegrationTest
         {
             [ClaimTypes.Role] = "Manager"
         };
-        
+
         var token = Factory.CreateTestJwtToken("test-user", null, claims);
         var client = Factory.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");

@@ -23,7 +23,7 @@ public class PermissionPrecedenceTests : BaseIntegrationTest
 
         // Arrange
         await CleanDatabaseAsync();
-        
+
         // Create an invoice first using admin client
         var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", new CreateInvoiceRequest
         {
@@ -36,13 +36,13 @@ public class PermissionPrecedenceTests : BaseIntegrationTest
             DueDate = DateTime.UtcNow.Date.AddDays(30),
             Lines = new List<InvoiceLineItemRequest> { new() { LineNumber = 1, Description = "Item", Quantity = 1, UnitPrice = 100, TaxCategory = "VAT" } }
         });
-        
+
         if (createResponse.StatusCode != HttpStatusCode.Created)
         {
             var error = await createResponse.Content.ReadAsStringAsync();
             throw new Exception($"Failed to create invoice: {createResponse.StatusCode}. Error: {error}");
         }
-        
+
         var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
         // Create client with 'Manager' role claim but ONLY 'read' permission
@@ -51,7 +51,7 @@ public class PermissionPrecedenceTests : BaseIntegrationTest
             [ClaimTypes.Role] = "Manager",
             ["permissions"] = InvoicePermissions.InvoicesRead
         };
-        
+
         var token = Factory.CreateTestJwtToken("test-user", null, claims);
         var client = Factory.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");

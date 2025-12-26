@@ -118,7 +118,7 @@ public class InvoiceSearchTests : BaseIntegrationTest
 
         Assert.NotNull(result);
         Assert.NotNull(result!.Items);
-        Assert.All(result.Items, i => 
+        Assert.All(result.Items, i =>
         {
             Assert.Equal("Finalized", i.Status);
             Assert.Equal(targetCustomerId, i.CustomerId);
