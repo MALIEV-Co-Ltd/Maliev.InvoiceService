@@ -52,13 +52,15 @@ public interface IInvoiceService
     /// <summary>
     /// Finalizes a draft invoice, assigning a sequential invoice number and making it immutable.
     /// Only invoices in Draft status can be finalized.
+    /// Supports idempotency to prevent duplicate finalization on network retries.
     /// </summary>
     /// <param name="id">Invoice ID.</param>
     /// <param name="finalizedBy">User performing the finalization.</param>
+    /// <param name="idempotencyKey">Optional idempotency key to prevent duplicate operations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The finalized invoice with assigned invoice number.</returns>
     /// <exception cref="InvalidOperationException">If invoice is not in Draft status.</exception>
-    Task<InvoiceResponse> FinalizeInvoiceAsync(Guid id, string finalizedBy, CancellationToken cancellationToken = default);
+    Task<InvoiceResponse> FinalizeInvoiceAsync(Guid id, string finalizedBy, string? idempotencyKey = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Cancels an invoice with a specified reason.
@@ -79,7 +81,7 @@ public interface IInvoiceService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The updated invoice.</returns>
     /// <exception cref="InvalidOperationException">If invoice is not in Draft status.</exception>
-    Task<InvoiceResponse> UpdateInvoiceAsync(Guid id, CreateInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<InvoiceResponse> UpdateInvoiceAsync(Guid id, UpdateInvoiceRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Soft deletes a draft invoice. Only Draft invoices can be deleted.

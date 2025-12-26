@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Maliev.InvoiceService.Api.Services;
 using Maliev.InvoiceService.Api.Models.Audit;
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.InvoiceService.Api.Authorization;
 
 namespace Maliev.InvoiceService.Api.Controllers;
 
@@ -12,7 +14,6 @@ namespace Maliev.InvoiceService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("invoice/v{version:apiVersion}/audit")]
-[Authorize(Policy = "Manager")]
 public class AuditController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
@@ -38,6 +39,7 @@ public class AuditController : ControllerBase
     /// <response code="200">Audit trail retrieved successfully.</response>
     /// <response code="404">Invoice not found.</response>
     [HttpGet("invoices/{id:guid}")]
+    [RequirePermission(InvoicePermissions.InvoicesRead)]
     [ProducesResponseType(typeof(List<AuditLogResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<List<AuditLogResponse>>> GetInvoiceAuditTrail(Guid id, CancellationToken cancellationToken)

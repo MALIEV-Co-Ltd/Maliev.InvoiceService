@@ -155,6 +155,11 @@ public class InvoiceResponse
     public string? PdfFileReference { get; set; }
 
     /// <summary>
+    /// Gets or sets the concurrency token for optimistic concurrency control.
+    /// </summary>
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
+    /// <summary>
     /// Gets or sets the timestamp when the invoice was created (UTC).
     /// </summary>
     public DateTime CreatedAt { get; set; }

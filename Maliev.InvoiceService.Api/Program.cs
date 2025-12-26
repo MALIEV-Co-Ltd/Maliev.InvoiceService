@@ -1,6 +1,6 @@
-using Maliev.InvoiceService.Api.Middleware;
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Services.External;
+using Maliev.Aspire.ServiceDefaults;
 
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Data.Interceptors;
@@ -13,16 +13,21 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+builder.AddStandardMiddleware(options =>
+{
+    options.EnableRequestLogging = true;
+});
 builder.AddServiceMeters("invoices-meter"); // Register service meters for OpenTelemetry business metrics
+
+builder.Services.AddHttpContextAccessor();
 
 // Database Context with ServiceDefaults + custom interceptors
 builder.AddPostgresDbContext<InvoiceDbContext>(
-    connectionStringName: "InvoiceDbContext",
-    configureOptions: options =>
+    connectionName: "InvoiceDbContext",
+    configureOptions: (sp, options) =>
     {
-        // Add custom interceptors for audit logging and metrics
         options.AddInterceptors(
-            new AuditLogInterceptor(),
+            new AuditLogInterceptor(sp.GetService<IHttpContextAccessor>()),
             new DatabaseMetricsInterceptor()
         );
     });
@@ -37,32 +42,24 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
 builder.AddJwtAuthentication();
 
-// Authorization Policies
-builder.Services.AddAuthorization(options =>
-{
-    // Policy allowing any authenticated user (Employee role or higher)
-    options.AddPolicy("EmployeeOrHigher", policy =>
-        policy.RequireAuthenticatedUser());
+// Add IAM client
+builder.Services.AddIAMClient(builder.Configuration, "InvoiceService");
 
-    // Policy requiring Manager or Admin role
-    options.AddPolicy("Manager", policy =>
-        policy.RequireRole("Manager", "manager", "admin"));
-});
+// Register permissions/roles on startup
+builder.Services.AddIAMRegistration<Maliev.InvoiceService.Api.Services.InvoiceIAMRegistrationService>();
+
+// Register claims transformation for legacy role mapping
+builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, Maliev.InvoiceService.Api.Authorization.IAMClaimsTransformation>();
+
+// Authorization with Permission Policy Provider
+builder.Services.AddPermissionAuthorization();
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
 {
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddOpenApi("v1", options =>
-    {
-        options.AddDocumentTransformer((document, context, cancellationToken) =>
-        {
-            document.Info.Title = "MALIEV Invoice Service API";
-            document.Info.Version = "v1";
-            document.Info.Description = "Invoice lifecycle management service. Handles invoice creation from quotations, draft editing, finalization with sequential numbering, payment recording, invoice splitting for partial billing, cancellation, CSV/JSON export, and audit trail tracking.";
-            return Task.CompletedTask;
-        });
-    });
+    builder.AddStandardOpenApi(
+        title: "MALIEV Invoice Service API",
+        description: "Invoice lifecycle management service. Handles invoice creation from quotations, draft editing, finalization with sequential numbering, payment recording, invoice splitting for partial billing, cancellation, CSV/JSON export, and audit trail tracking.");
 }
 
 builder.Services.AddControllers();
@@ -73,16 +70,9 @@ builder.Services.AddScoped<Maliev.InvoiceService.Api.Services.IInvoiceService, M
 // Background Services
 builder.Services.AddHostedService<Maliev.InvoiceService.Api.Services.BackgroundServices.AuditArchivalService>();
 
-// External Service Options
-builder.Services.Configure<CurrencyServiceOptions>(builder.Configuration.GetSection("ExternalServices:Currency"));
-builder.Services.Configure<QuotationServiceOptions>(builder.Configuration.GetSection("ExternalServices:Quotation"));
-
 // External Service Clients with Polly v8 Resilience
-builder.Services.AddHttpClient<ICurrencyServiceClient, CurrencyServiceClient>()
-    .AddStandardResilienceHandler();
-
-builder.Services.AddHttpClient<IQuotationServiceClient, QuotationServiceClient>()
-    .AddStandardResilienceHandler();
+builder.AddServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService");
+builder.AddServiceClient<IQuotationServiceClient, QuotationServiceClient>("QuotationService");
 
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -102,8 +92,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 }
 
 // Middleware Pipeline
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseStandardMiddleware();
 
 app.UseHttpsRedirection();
 app.UseCors();
