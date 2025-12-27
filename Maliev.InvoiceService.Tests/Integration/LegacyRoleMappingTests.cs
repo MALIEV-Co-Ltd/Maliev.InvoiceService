@@ -54,7 +54,7 @@ public class LegacyRoleMappingTests : BaseIntegrationTest
             [ClaimTypes.Role] = "Manager"
         };
 
-        var token = Factory.CreateTestJwtToken("test-user", null, claims);
+        var token = Factory.CreateTestJwtToken(userId: "test-user", additionalClaims: claims);
         var client = Factory.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
 

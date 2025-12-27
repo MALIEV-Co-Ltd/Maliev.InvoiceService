@@ -1,3 +1,4 @@
+using Maliev.InvoiceService.Api.Authorization;
 using Maliev.InvoiceService.Tests.Fixtures;
 
 namespace Maliev.InvoiceService.Tests.Contract;
@@ -14,7 +15,7 @@ public abstract class BaseContractTest : IClassFixture<TestWebApplicationFactory
     protected BaseContractTest(TestWebApplicationFactory factory)
     {
         Factory = factory;
-        Client = Factory.CreateAuthenticatedClient("test-admin", new[] { "admin" });
+        Client = Factory.CreateAuthenticatedClient("test-admin", new[] { "admin" }, InvoicePermissions.All);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

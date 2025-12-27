@@ -38,7 +38,7 @@ public class FeatureFlagAuthTests : IClassFixture<TestWebApplicationFactory>
         {
             [ClaimTypes.Role] = "Manager"
         };
-        var token = _factory.CreateTestJwtToken("test-user", null, claims);
+        var token = _factory.CreateTestJwtToken(userId: "test-user", additionalClaims: claims);
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
 
         // Act
@@ -72,7 +72,7 @@ public class FeatureFlagAuthTests : IClassFixture<TestWebApplicationFactory>
         {
             [ClaimTypes.Role] = "UnmappedRole"
         };
-        var token = _factory.CreateTestJwtToken("test-user", null, claims);
+        var token = _factory.CreateTestJwtToken(userId: "test-user", additionalClaims: claims);
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
 
         // Act
