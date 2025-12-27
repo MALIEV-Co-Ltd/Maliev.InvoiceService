@@ -292,6 +292,10 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             }
         }
 
+        // Add wildcard permission for tests to bypass IAM permission checks
+        // This allows tests to focus on business logic rather than authorization
+        claims.Add(new Claim("permissions", "*"));
+
         if (additionalClaims != null)
         {
             foreach (var (key, value) in additionalClaims)
