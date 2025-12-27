@@ -15,7 +15,6 @@ public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, Inv
     protected override void ConfigureEnvironmentVariables()
     {
         base.ConfigureEnvironmentVariables();
-        Environment.SetEnvironmentVariable("Features__PermissionBasedAuthEnabled", "true");
     }
 
     protected override void ConfigureAdditionalServices(IServiceCollection services)
