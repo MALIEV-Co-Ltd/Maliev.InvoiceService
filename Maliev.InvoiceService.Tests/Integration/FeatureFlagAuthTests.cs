@@ -18,7 +18,7 @@ public class FeatureFlagAuthTests : IClassFixture<TestWebApplicationFactory>
         _factory = factory;
     }
 
-    [Fact]
+    [Fact(Skip = "PermissionBasedAuthEnabled feature flag removed - permission-based auth is always enforced")]
     public async Task WhenFeatureFlagDisabled_ShouldAllowBasedOnLegacyRoles()
     {
         // Arrange
