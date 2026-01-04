@@ -7,7 +7,7 @@ namespace Maliev.InvoiceService.Tests.Contract;
 /// Base class for contract tests providing common utilities and cleanup helpers.
 /// </summary>
 [Collection("InvoiceService Collection")]
-public abstract class BaseContractTest : IClassFixture<TestWebApplicationFactory>, IAsyncLifetime
+public abstract class BaseContractTest : IAsyncLifetime
 {
     protected readonly TestWebApplicationFactory Factory;
     protected readonly HttpClient Client;

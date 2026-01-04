@@ -9,7 +9,8 @@ using Moq.Protected;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
-public class IAMRegistrationTests : IClassFixture<TestWebApplicationFactory>
+[Collection("InvoiceService Collection")]
+public class IAMRegistrationTests
 {
     private readonly TestWebApplicationFactory _factory;
 

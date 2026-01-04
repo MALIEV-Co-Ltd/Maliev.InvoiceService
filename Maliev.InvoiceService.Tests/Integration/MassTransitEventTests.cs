@@ -12,6 +12,7 @@ namespace Maliev.InvoiceService.Tests.Integration;
 
 /// <summary>
 /// Integration tests for MassTransit event publishing and consuming in InvoiceService.
+/// Uses its own TestWebApplicationFactory instance to avoid test interference.
 /// </summary>
 public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, IAsyncLifetime
 {
@@ -363,7 +364,8 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.True(await harness.Published.Any<InvoiceGeneratedEvent>(),
                 "InvoiceGeneratedEvent should be published");
 
-            var publishedMessage = harness.Published.Select<InvoiceGeneratedEvent>().FirstOrDefault();
+            var publishedMessage = harness.Published.Select<InvoiceGeneratedEvent>()
+                .FirstOrDefault(x => x.Context.Message.Payload.InvoiceId == createdInvoice.Id);
             Assert.NotNull(publishedMessage);
 
             var @event = publishedMessage.Context.Message;
@@ -475,6 +477,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task PaymentCompletedEventConsumer_ShouldLogPaymentNotification()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var orderId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
 
@@ -526,6 +529,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task OrderPaidEventConsumer_ShouldLogOrderPayment()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var orderId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
 
