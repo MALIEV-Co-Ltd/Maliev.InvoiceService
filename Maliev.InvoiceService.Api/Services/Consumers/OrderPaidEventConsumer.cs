@@ -10,13 +10,13 @@ namespace Maliev.InvoiceService.Api.Services.Consumers;
 /// </summary>
 public partial class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 {
-    private readonly Api.Services.InvoiceService _invoiceService;
+    private readonly IInvoiceService _invoiceService;
     private readonly ILogger<OrderPaidEventConsumer> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OrderPaidEventConsumer"/> class.
     /// </summary>
-    public OrderPaidEventConsumer(Api.Services.InvoiceService invoiceService, ILogger<OrderPaidEventConsumer> logger)
+    public OrderPaidEventConsumer(IInvoiceService invoiceService, ILogger<OrderPaidEventConsumer> logger)
     {
         _invoiceService = invoiceService;
         _logger = logger;
