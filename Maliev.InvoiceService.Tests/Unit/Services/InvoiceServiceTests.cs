@@ -3,6 +3,7 @@ using Maliev.InvoiceService.Api.Services;
 using Maliev.InvoiceService.Api.Services.External;
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Models;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -22,6 +23,7 @@ public class InvoiceServiceTests : IAsyncLifetime
     private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<ICurrencyServiceClient> _currencyClientMock;
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
+    private readonly Mock<IPublishEndpoint> _publishEndpointMock;
     private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().Build();
 
     public InvoiceServiceTests()
@@ -30,6 +32,7 @@ public class InvoiceServiceTests : IAsyncLifetime
         _cacheMock = new Mock<IDistributedCache>();
         _currencyClientMock = new Mock<ICurrencyServiceClient>();
         _quotationClientMock = new Mock<IQuotationServiceClient>();
+        _publishEndpointMock = new Mock<IPublishEndpoint>();
     }
 
     public async Task InitializeAsync()
@@ -243,7 +246,8 @@ public class InvoiceServiceTests : IAsyncLifetime
             _loggerMock.Object,
             _cacheMock.Object,
             _currencyClientMock.Object,
-            _quotationClientMock.Object
+            _quotationClientMock.Object,
+            _publishEndpointMock.Object
         );
 
         var updateRequest = new UpdateInvoiceRequest
@@ -299,7 +303,8 @@ public class InvoiceServiceTests : IAsyncLifetime
             _loggerMock.Object,
             _cacheMock.Object,
             _currencyClientMock.Object,
-            _quotationClientMock.Object
+            _quotationClientMock.Object,
+            _publishEndpointMock.Object
         );
 
         var updateRequest = new UpdateInvoiceRequest
@@ -353,7 +358,8 @@ public class InvoiceServiceTests : IAsyncLifetime
             _loggerMock.Object,
             _cacheMock.Object,
             _currencyClientMock.Object,
-            _quotationClientMock.Object
+            _quotationClientMock.Object,
+            _publishEndpointMock.Object
         );
 
         var updateRequest = new UpdateInvoiceRequest
@@ -406,7 +412,8 @@ public class InvoiceServiceTests : IAsyncLifetime
             _loggerMock.Object,
             _cacheMock.Object,
             _currencyClientMock.Object,
-            _quotationClientMock.Object
+            _quotationClientMock.Object,
+            _publishEndpointMock.Object
         );
 
         var request = new CreateInvoiceRequest
@@ -457,7 +464,8 @@ public class InvoiceServiceTests : IAsyncLifetime
             _loggerMock.Object,
             _cacheMock.Object,
             _currencyClientMock.Object,
-            _quotationClientMock.Object
+            _quotationClientMock.Object,
+            _publishEndpointMock.Object
         );
 
         var request = new CreateInvoiceRequest

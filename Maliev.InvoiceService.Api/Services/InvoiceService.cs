@@ -9,6 +9,8 @@ using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Models;
 using System.Text;
 using System.Text.Json;
+using MassTransit;
+using Maliev.MessagingContracts.Generated;
 
 namespace Maliev.InvoiceService.Api.Services;
 
@@ -30,6 +32,7 @@ public class InvoiceService : IInvoiceService
     private readonly IDistributedCache _cache;
     private readonly ICurrencyServiceClient _currencyClient;
     private readonly IQuotationServiceClient _quotationClient;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InvoiceService"/> class.
@@ -39,18 +42,21 @@ public class InvoiceService : IInvoiceService
     /// <param name="cache">Distributed cache for performance optimization.</param>
     /// <param name="currencyClient">Client for retrieving exchange rates from Currency Service.</param>
     /// <param name="quotationClient">Client for retrieving quotation data from Quotation Service.</param>
+    /// <param name="publishEndpoint">MassTransit publish endpoint for publishing events.</param>
     public InvoiceService(
         InvoiceDbContext context,
         ILogger<InvoiceService> logger,
         IDistributedCache cache,
         ICurrencyServiceClient currencyClient,
-        IQuotationServiceClient quotationClient)
+        IQuotationServiceClient quotationClient,
+        IPublishEndpoint publishEndpoint)
     {
         _context = context;
         _logger = logger;
         _cache = cache;
         _currencyClient = currencyClient;
         _quotationClient = quotationClient;
+        _publishEndpoint = publishEndpoint;
     }
 
     /// <inheritdoc/>
@@ -200,6 +206,31 @@ public class InvoiceService : IInvoiceService
         await _cache.RemoveAsync($"invoice:{invoice.Id}", cancellationToken);
 
         _logger.LogInformation("Created invoice {InvoiceId} for customer {CustomerId}", invoice.Id, invoice.CustomerId);
+
+        // Publish InvoiceCreatedEvent
+        await _publishEndpoint.Publish(new InvoiceCreatedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "InvoiceCreatedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "InvoiceService",
+            ConsumedBy: ["NotificationService", "AnalyticsService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new InvoiceCreatedEventPayload(
+                InvoiceId: invoice.Id,
+                InvoiceNumber: invoice.InvoiceNumber ?? "DRAFT",
+                OrderId: null, // Will be set by consumers if linked
+                OrderNumber: null,
+                CustomerId: invoice.CustomerId,
+                TotalAmount: (double)invoice.GrandTotal,
+                Currency: invoice.Currency,
+                DueDate: invoice.DueDate != default ? new DateTimeOffset(invoice.DueDate, TimeSpan.Zero) : null,
+                CreatedAt: new DateTimeOffset(invoice.CreatedAt, TimeSpan.Zero)
+            )
+        ), cancellationToken);
 
         return MapToResponse(invoice);
     }
@@ -815,9 +846,37 @@ public class InvoiceService : IInvoiceService
         invoice.CancellationReason = reason;
         invoice.UpdatedAt = DateTime.UtcNow;
 
+        // Check if invoice had payments (refund may be required)
+        var hadPayments = await _context.InvoicePaymentAllocations
+            .AnyAsync(ipa => ipa.InvoiceId == id, cancellationToken);
+
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Cancelled invoice {InvoiceId}", invoice.Id);
+
+        // Publish InvoiceCancelledEvent
+        Guid.TryParse(cancelledBy, out var cancelledByIdParsed);
+        await _publishEndpoint.Publish(new InvoiceCancelledEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "InvoiceCancelledEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "InvoiceService",
+            ConsumedBy: ["PaymentService", "NotificationService", "AnalyticsService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new InvoiceCancelledEventPayload(
+                InvoiceId: id,
+                InvoiceNumber: invoice.InvoiceNumber ?? "UNKNOWN",
+                CustomerId: invoice.CustomerId,
+                CancelledBy: cancelledByIdParsed,
+                CancelledAt: new DateTimeOffset(invoice.CancelledAt.Value, TimeSpan.Zero),
+                CancellationReason: reason,
+                RefundRequired: hadPayments
+            )
+        ), cancellationToken);
 
         return MapToResponse(invoice);
     }
@@ -1203,6 +1262,57 @@ public class InvoiceService : IInvoiceService
             "Allocated payment to invoice: PaymentId={PaymentId}, InvoiceId={InvoiceId}, Amount={Amount}, NewStatus={Status}, OutstandingBalance={OutstandingBalance}",
             paymentId, invoiceId, allocatedAmount, invoice.Status, newOutstandingBalance);
 
+        // Publish InvoicePaymentReceivedEvent
+        Guid.TryParse(allocatedBy, out var allocatedByIdParsed);
+        await _publishEndpoint.Publish(new InvoicePaymentReceivedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "InvoicePaymentReceivedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "InvoiceService",
+            ConsumedBy: ["NotificationService", "AnalyticsService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new InvoicePaymentReceivedEventPayload(
+                InvoiceId: invoiceId,
+                InvoiceNumber: invoice.InvoiceNumber ?? "UNKNOWN",
+                PaymentId: paymentId,
+                AllocatedAmount: (double)allocatedAmount,
+                Currency: invoice.Currency,
+                RemainingBalance: (double)newOutstandingBalance,
+                AllocatedAt: new DateTimeOffset(allocation.AllocationDate, TimeSpan.Zero),
+                AllocatedBy: allocatedByIdParsed
+            )
+        ), cancellationToken);
+
+        // Publish InvoiceFullyPaidEvent if invoice is fully paid
+        if (invoice.Status == "FullyPaid")
+        {
+            await _publishEndpoint.Publish(new InvoiceFullyPaidEvent(
+                MessageId: Guid.NewGuid(),
+                MessageName: "InvoiceFullyPaidEvent",
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "InvoiceService",
+                ConsumedBy: ["NotificationService", "AnalyticsService"],
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new InvoiceFullyPaidEventPayload(
+                    InvoiceId: invoiceId,
+                    InvoiceNumber: invoice.InvoiceNumber ?? "UNKNOWN",
+                    CustomerId: invoice.CustomerId,
+                    TotalAmount: (double)invoice.GrandTotal,
+                    Currency: invoice.Currency,
+                    LastPaymentId: paymentId,
+                    FullyPaidAt: DateTimeOffset.UtcNow
+                )
+            ), cancellationToken);
+        }
+
         // Add audit log entry for PaymentLinked event (T177)
         var changedFields = new
         {
@@ -1431,6 +1541,26 @@ public class InvoiceService : IInvoiceService
         await _cache.RemoveAsync($"invoice:{invoiceId}", cancellationToken);
 
         _logger.LogInformation("Registered PDF file reference for invoice {InvoiceId}: {PdfFileReference}", invoiceId, pdfFileReference);
+
+        // Publish InvoiceGeneratedEvent
+        await _publishEndpoint.Publish(new InvoiceGeneratedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "InvoiceGeneratedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "InvoiceService",
+            ConsumedBy: ["NotificationService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new InvoiceGeneratedEventPayload(
+                InvoiceId: invoiceId,
+                InvoiceNumber: invoice.InvoiceNumber ?? "UNKNOWN",
+                PdfUrl: pdfFileReference,
+                GeneratedAt: DateTimeOffset.UtcNow
+            )
+        ), cancellationToken);
 
         // Audit log
         var changedFields = new

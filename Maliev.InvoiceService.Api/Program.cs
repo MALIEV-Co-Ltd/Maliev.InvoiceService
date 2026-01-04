@@ -33,7 +33,13 @@ builder.AddPostgresDbContext<InvoiceDbContext>(
     });
 
 builder.AddRedisDistributedCache(instanceName: "invoice:"); // Redis with in-memory fallback
-builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
+builder.AddMassTransitWithRabbitMq(x =>
+{
+    x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.FileDeletedEventConsumer>();
+    x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.PaymentCompletedEventConsumer>();
+    x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.OrderPaidEventConsumer>();
+    x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.PdfGenerationCompletedEventConsumer>();
+}); // RabbitMQ message bus (non-blocking startup)
 
 // --- API Configuration ---
 builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
@@ -73,9 +79,10 @@ builder.Services.AddHostedService<Maliev.InvoiceService.Api.Services.BackgroundS
 // External Service Clients with Polly v8 Resilience
 builder.AddServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService");
 builder.AddServiceClient<IQuotationServiceClient, QuotationServiceClient>("QuotationService");
+builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
 
 var app = builder.Build();
-var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var logger = app.Services.GetRequiredService<ILogger<Maliev.InvoiceService.Api.Program>>();
 
 // --- Database Migrations ---
 await app.MigrateDatabaseAsync<InvoiceDbContext>();
@@ -98,21 +105,24 @@ app.MapDefaultEndpoints(servicePrefix: "invoice");
 // Map OpenAPI and Scalar documentation (dev/staging only)
 app.MapApiDocumentation(servicePrefix: "invoice");
 
-Log.ServiceStarted(logger);
+Maliev.InvoiceService.Api.Program.Log.ServiceStarted(logger);
 await app.RunAsync();
 
-/// <summary>
-/// Main program class for the application
-/// </summary>
-public partial class Program
+namespace Maliev.InvoiceService.Api
 {
-    internal static partial class Log
+    /// <summary>
+    /// Main program class for the application
+    /// </summary>
+    public partial class Program
     {
-        [LoggerMessage(Level = LogLevel.Information, Message = "InvoiceService started successfully")]
-        public static partial void ServiceStarted(ILogger logger);
+        internal static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Information, Message = "InvoiceService started successfully")]
+            public static partial void ServiceStarted(ILogger logger);
 
-        [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
-        public static partial void MigrationFailed(ILogger logger, Exception exception);
+            [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
+            public static partial void MigrationFailed(ILogger logger, Exception exception);
+        }
     }
 }
 
