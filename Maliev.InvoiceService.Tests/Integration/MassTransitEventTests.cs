@@ -39,6 +39,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task CreateInvoice_ShouldPublishInvoiceCreatedEvent()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var createRequest = new CreateInvoiceRequest
         {
@@ -72,11 +73,15 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             // Assert
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
+            var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
+            Assert.NotNull(invoice);
+
             // Verify InvoiceCreatedEvent was published
             Assert.True(await harness.Published.Any<InvoiceCreatedEvent>(),
                 "InvoiceCreatedEvent should be published");
 
-            var publishedMessage = harness.Published.Select<InvoiceCreatedEvent>().FirstOrDefault();
+            var publishedMessage = harness.Published.Select<InvoiceCreatedEvent>()
+                .FirstOrDefault(x => x.Context.Message.Payload.InvoiceId == invoice.Id);
             Assert.NotNull(publishedMessage);
 
             var @event = publishedMessage.Context.Message;
@@ -84,7 +89,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.Equal("InvoiceService", @event.PublishedBy);
             Assert.Equal(MessageType.Event, @event.MessageType);
             Assert.NotNull(@event.Payload);
-            Assert.NotEqual(Guid.Empty, @event.Payload.InvoiceId);
+            Assert.Equal(invoice.Id, @event.Payload.InvoiceId);
             Assert.NotNull(@event.Payload.InvoiceNumber);
             Assert.Equal("THB", @event.Payload.Currency);
             Assert.Equal(customerId, @event.Payload.CustomerId);
@@ -99,6 +104,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task AllocatePayment_ShouldPublishInvoicePaymentReceivedEvent()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         // First create an invoice
         var customerId = Guid.NewGuid();
         var createRequest = new CreateInvoiceRequest
@@ -110,6 +116,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             {
                 new InvoiceLineItemRequest
                 {
+                    LineNumber = 1,
                     Description = "Test Item",
                     Quantity = 1,
                     UnitPrice = 1000.00m,
@@ -126,18 +133,19 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         Assert.NotNull(createdInvoice);
 
         // Finalize the invoice first
-        await _client.PostAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", null);
+        await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
 
         try
         {
-            // Act - Allocate payment
+            // Act - Link payment
             var paymentId = Guid.NewGuid();
-            HttpResponseMessage allocateResponse = await _client.PostAsync(
-                $"/invoice/v1/invoices/{createdInvoice.Id}/allocate?paymentId={paymentId}&allocatedAmount=500.00",
-                null);
+            var linkRequest = new { PaymentId = paymentId, AllocatedAmount = 500.00m };
+            HttpResponseMessage allocateResponse = await _client.PostAsJsonAsync(
+                $"/invoice/v1/payments/invoices/{createdInvoice.Id}/link",
+                linkRequest);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, allocateResponse.StatusCode);
@@ -146,7 +154,8 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.True(await harness.Published.Any<InvoicePaymentReceivedEvent>(),
                 "InvoicePaymentReceivedEvent should be published");
 
-            var publishedMessage = harness.Published.Select<InvoicePaymentReceivedEvent>().FirstOrDefault();
+            var publishedMessage = harness.Published.Select<InvoicePaymentReceivedEvent>()
+                .FirstOrDefault(x => x.Context.Message.Payload.InvoiceId == createdInvoice.Id);
             Assert.NotNull(publishedMessage);
 
             var @event = publishedMessage.Context.Message;
@@ -166,6 +175,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task AllocatePaymentToFullyPay_ShouldPublishInvoiceFullyPaidEvent()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var createRequest = new CreateInvoiceRequest
         {
@@ -176,6 +186,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             {
                 new InvoiceLineItemRequest
                 {
+                    LineNumber = 1,
                     Description = "Small Item",
                     Quantity = 1,
                     UnitPrice = 100.00m,
@@ -192,7 +203,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         Assert.NotNull(createdInvoice);
 
         // Finalize the invoice
-        await _client.PostAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", null);
+        await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -201,9 +212,10 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         {
             // Act - Fully pay the invoice
             var paymentId = Guid.NewGuid();
-            HttpResponseMessage allocateResponse = await _client.PostAsync(
-                $"/invoice/v1/invoices/{createdInvoice.Id}/allocate?paymentId={paymentId}&allocatedAmount=107.00",
-                null);
+            var linkRequest = new { PaymentId = paymentId, AllocatedAmount = 107.00m };
+            HttpResponseMessage allocateResponse = await _client.PostAsJsonAsync(
+                $"/invoice/v1/payments/invoices/{createdInvoice.Id}/link",
+                linkRequest);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, allocateResponse.StatusCode);
@@ -234,6 +246,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task CancelInvoice_ShouldPublishInvoiceCancelledEvent()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var createRequest = new CreateInvoiceRequest
         {
@@ -244,6 +257,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             {
                 new InvoiceLineItemRequest
                 {
+                    LineNumber = 1,
                     Description = "Test Product",
                     Quantity = 1,
                     UnitPrice = 500.00m,
@@ -260,7 +274,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         Assert.NotNull(createdInvoice);
 
         // Finalize the invoice
-        await _client.PostAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", null);
+        await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -268,9 +282,10 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         try
         {
             // Act - Cancel invoice
-            HttpResponseMessage cancelResponse = await _client.PostAsync(
-                $"/invoice/v1/invoices/{createdInvoice.Id}/cancel?reason=Test cancellation",
-                null);
+            var cancelRequest = new { CancelledBy = "test-admin", CancellationReason = "Test cancellation" };
+            HttpResponseMessage cancelResponse = await _client.PostAsJsonAsync(
+                $"/invoice/v1/invoices/{createdInvoice.Id}/cancel",
+                cancelRequest);
 
             // Assert
             Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
@@ -300,6 +315,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task RegisterPdfFileReference_ShouldPublishInvoiceGeneratedEvent()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var createRequest = new CreateInvoiceRequest
         {
@@ -310,6 +326,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             {
                 new InvoiceLineItemRequest
                 {
+                    LineNumber = 1,
                     Description = "Test Product",
                     Quantity = 1,
                     UnitPrice = 250.00m,
@@ -326,7 +343,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         Assert.NotNull(createdInvoice);
 
         // Finalize the invoice
-        await _client.PostAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", null);
+        await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -335,12 +352,12 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         {
             // Act - Register PDF file reference (simulates PDF generation completion)
             var pdfUrl = $"https://storage.example.com/invoices/{createdInvoice.Id}.pdf";
-            HttpResponseMessage pdfResponse = await _client.PostAsJsonAsync(
-                $"/invoice/v1/invoices/{createdInvoice.Id}/pdf",
-                new { PdfUrl = pdfUrl });
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"/invoice/v1/invoices/{createdInvoice.Id}/pdf-reference");
+            request.Content = JsonContent.Create(new { PdfFileReference = pdfUrl });
+            HttpResponseMessage pdfResponse = await _client.SendAsync(request);
 
             // Assert
-            Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, pdfResponse.StatusCode);
 
             // Verify InvoiceGeneratedEvent was published
             Assert.True(await harness.Published.Any<InvoiceGeneratedEvent>(),
@@ -365,6 +382,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task PdfGenerationCompletedEventConsumer_ShouldRegisterPdfUrl()
     {
         // Arrange
+        await _factory.CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var createRequest = new CreateInvoiceRequest
         {
@@ -375,6 +393,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             {
                 new InvoiceLineItemRequest
                 {
+                    LineNumber = 1,
                     Description = "Test Product for PDF",
                     Quantity = 1,
                     UnitPrice = 300.00m,
@@ -391,7 +410,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         Assert.NotNull(createdInvoice);
 
         // Finalize the invoice
-        await _client.PostAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", null);
+        await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -426,12 +445,18 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.True(await harness.Consumed.Any<PdfGenerationCompletedEvent>(),
                 "PdfGenerationCompletedEvent should be consumed");
 
-            // Give time for async processing
-            await Task.Delay(500);
+            // Give time for async processing and poll for PDF reference
+            InvoiceResponse? updatedInvoice = null;
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(200);
+                HttpResponseMessage getResponse = await _client.GetAsync($"/invoice/v1/invoices/{createdInvoice.Id}");
+                updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
+                if (updatedInvoice?.PdfFileReference != null)
+                    break;
+            }
 
             // Assert - Verify invoice has PDF URL
-            HttpResponseMessage getResponse = await _client.GetAsync($"/invoice/v1/invoices/{createdInvoice.Id}");
-            var updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
             Assert.NotNull(updatedInvoice);
             Assert.NotNull(updatedInvoice.PdfFileReference);
             Assert.Contains(pdfUrl, updatedInvoice.PdfFileReference);
