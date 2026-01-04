@@ -8,13 +8,13 @@ namespace Maliev.InvoiceService.Api.Services.Consumers;
 /// </summary>
 public partial class PdfGenerationCompletedEventConsumer : IConsumer<PdfGenerationCompletedEvent>
 {
-    private readonly Api.Services.InvoiceService _invoiceService;
+    private readonly IInvoiceService _invoiceService;
     private readonly ILogger<PdfGenerationCompletedEventConsumer> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PdfGenerationCompletedEventConsumer"/> class.
     /// </summary>
-    public PdfGenerationCompletedEventConsumer(Api.Services.InvoiceService invoiceService, ILogger<PdfGenerationCompletedEventConsumer> logger)
+    public PdfGenerationCompletedEventConsumer(IInvoiceService invoiceService, ILogger<PdfGenerationCompletedEventConsumer> logger)
     {
         _invoiceService = invoiceService;
         _logger = logger;

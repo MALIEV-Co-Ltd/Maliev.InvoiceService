@@ -8,7 +8,7 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Base class for integration tests providing common utilities and cleanup helpers.
 /// </summary>
 [Collection("InvoiceService Collection")]
-public abstract class BaseIntegrationTest : IClassFixture<TestWebApplicationFactory>, IAsyncLifetime
+public abstract class BaseIntegrationTest : IAsyncLifetime
 {
     protected readonly TestWebApplicationFactory Factory;
     protected readonly HttpClient Client;
