@@ -55,28 +55,12 @@ public class IAMClaimsTransformation : IClaimsTransformation
         foreach (var role in roles)
         {
             var normalizedRole = role.ToLower();
-            if (normalizedRole.StartsWith("roles.invoice."))
-            {
-                normalizedRole = normalizedRole.Replace("roles.invoice.", "");
-            }
+            var fullRoleId = normalizedRole.StartsWith("roles.invoice.") ? normalizedRole : $"roles.invoice.{normalizedRole}";
+            var roleTuple = InvoicePredefinedRoles.All.FirstOrDefault(r => r.RoleId == fullRoleId);
 
-            switch (normalizedRole)
+            if (roleTuple.RoleId != null)
             {
-                case "admin":
-                    foreach (var p in InvoicePermissions.All) mappedPermissions.Add(p);
-                    break;
-                case "manager":
-                    foreach (var p in InvoicePredefinedRoles.Manager.PermissionIds) mappedPermissions.Add(p);
-                    break;
-                case "creator":
-                    foreach (var p in InvoicePredefinedRoles.Creator.PermissionIds) mappedPermissions.Add(p);
-                    break;
-                case "viewer":
-                    foreach (var p in InvoicePredefinedRoles.Viewer.PermissionIds) mappedPermissions.Add(p);
-                    break;
-                case "accountant":
-                    foreach (var p in InvoicePredefinedRoles.Accountant.PermissionIds) mappedPermissions.Add(p);
-                    break;
+                foreach (var p in roleTuple.Permissions) mappedPermissions.Add(p);
             }
         }
 

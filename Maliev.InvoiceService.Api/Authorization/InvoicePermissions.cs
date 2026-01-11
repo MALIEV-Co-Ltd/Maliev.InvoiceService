@@ -61,14 +61,36 @@ public static class InvoicePermissions
     public const string ReportsExport = "invoice.reports.export";
 
     /// <summary>
+    /// Collection of all defined invoice permissions with descriptions.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> AllWithDescriptions = new Dictionary<string, string>
+    {
+        { InvoicesCreate, "Create new invoices" },
+        { InvoicesRead, "Read invoice details" },
+        { InvoicesUpdate, "Update invoice information" },
+        { InvoicesDelete, "Delete invoices" },
+        { InvoicesFinalize, "Finalize invoices (lock for editing)" },
+        { InvoicesApprove, "Approve invoices" },
+        { InvoicesVoid, "Void/cancel invoices" },
+        { InvoicesExport, "Export invoices to various formats" },
+        { InvoicesSend, "Send invoices to customers" },
+        { SegmentsCreate, "Create invoice segments" },
+        { SegmentsRead, "Read segment details" },
+        { SegmentsUpdate, "Update segments" },
+        { SegmentsDelete, "Delete segments" },
+        { SplitsCreate, "Create split invoices" },
+        { SplitsManage, "Manage split invoice relationships" },
+        { FilesUpload, "Upload files to invoices" },
+        { FilesRead, "Read/download invoice files" },
+        { FilesDelete, "Delete invoice files" },
+        { FilesRegister, "Register PDF files (service-to-service)" },
+        { ReportsCurrency, "View currency exchange reports" },
+        { ReportsAnalytics, "Access invoice analytics" },
+        { ReportsExport, "Export reports" }
+    };
+
+    /// <summary>
     /// All permissions defined for the Invoice Service.
     /// </summary>
-    public static readonly string[] All = new[]
-    {
-        InvoicesCreate, InvoicesRead, InvoicesUpdate, InvoicesDelete, InvoicesFinalize, InvoicesApprove, InvoicesVoid, InvoicesExport, InvoicesSend,
-        SegmentsCreate, SegmentsRead, SegmentsUpdate, SegmentsDelete,
-        SplitsCreate, SplitsManage,
-        FilesUpload, FilesRead, FilesDelete, FilesRegister,
-        ReportsCurrency, ReportsAnalytics, ReportsExport
-    };
+    public static readonly string[] All = AllWithDescriptions.Keys.ToArray();
 }

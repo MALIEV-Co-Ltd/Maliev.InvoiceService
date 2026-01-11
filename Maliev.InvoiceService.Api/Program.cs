@@ -1,5 +1,6 @@
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Services.External;
+using Maliev.InvoiceService.Api.Services;
 using Maliev.Aspire.ServiceDefaults;
 
 using Maliev.InvoiceService.Data.Data;
@@ -48,11 +49,9 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
 builder.AddJwtAuthentication();
 
-// Add IAM client
-builder.Services.AddIAMClient(builder.Configuration, "InvoiceService");
-
 // Register permissions/roles on startup
-builder.Services.AddIAMRegistration<Maliev.InvoiceService.Api.Services.InvoiceIAMRegistrationService>();
+builder.AddIAMServiceClient("invoice");
+builder.Services.AddIAMRegistration<InvoiceIAMRegistrationService>("invoice");
 
 // Register claims transformation for legacy role mapping
 builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, Maliev.InvoiceService.Api.Authorization.IAMClaimsTransformation>();
@@ -90,7 +89,10 @@ await app.MigrateDatabaseAsync<InvoiceDbContext>();
 // Middleware Pipeline
 app.UseStandardMiddleware();
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors();
 
 app.UseAuthentication();
@@ -125,4 +127,3 @@ namespace Maliev.InvoiceService.Api
         }
     }
 }
-
