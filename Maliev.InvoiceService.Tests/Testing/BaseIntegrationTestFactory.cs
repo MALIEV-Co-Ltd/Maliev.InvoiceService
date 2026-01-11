@@ -128,6 +128,14 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:SecurityKey"] = "test-secret-key-at-least-32-characters-long"
+            });
+        });
+
         builder.ConfigureTestServices(services =>
         {
             // Configure JWT Bearer authentication with test RSA key

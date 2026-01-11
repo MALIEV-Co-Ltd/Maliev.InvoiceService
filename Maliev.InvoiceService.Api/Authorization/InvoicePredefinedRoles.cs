@@ -1,27 +1,30 @@
-using Maliev.Aspire.ServiceDefaults.IAM;
-
 namespace Maliev.InvoiceService.Api.Authorization;
 
 /// <summary>
-/// Defines predefined roles for the Invoice Service.
+/// Predefined roles for the Invoice Service.
 /// Roles follow the GCP format: roles.invoice.{role-name}
 /// </summary>
 public static class InvoicePredefinedRoles
 {
-    /// <summary>Invoice Administrator role.</summary>
-    public static readonly RoleRegistration Admin = new()
-    {
-        RoleId = "roles.invoice.admin",
-        Description = "Full administrative access to all invoice operations",
-        PermissionIds = InvoicePermissions.All.ToList()
-    };
+    /// <summary>Role for administrators with full access.</summary>
+    public const string Admin = "roles.invoice.admin";
+    /// <summary>Role for managers who can finalize and approve.</summary>
+    public const string Manager = "roles.invoice.manager";
+    /// <summary>Role for creators who can manage own invoices.</summary>
+    public const string Creator = "roles.invoice.creator";
+    /// <summary>Role for users with read-only access.</summary>
+    public const string Viewer = "roles.invoice.viewer";
+    /// <summary>Role for accountants managing financial aspects.</summary>
+    public const string Accountant = "roles.invoice.accountant";
 
-    /// <summary>Invoice Manager role.</summary>
-    public static readonly RoleRegistration Manager = new()
+    /// <summary>
+    /// Collection of all predefined roles for the Invoice Service.
+    /// </summary>
+    public static readonly IReadOnlyList<(string RoleId, string Description, string[] Permissions)> All = new List<(string, string, string[])>
     {
-        RoleId = "roles.invoice.manager",
-        Description = "Can create, update, finalize, and approve invoices",
-        PermissionIds = new List<string>
+        (Admin, "Full administrative access to all invoice operations", InvoicePermissions.All),
+
+        (Manager, "Can create, update, finalize, and approve invoices", new[]
         {
             InvoicePermissions.InvoicesCreate,
             InvoicePermissions.InvoicesRead,
@@ -36,15 +39,9 @@ public static class InvoicePredefinedRoles
             InvoicePermissions.FilesRead,
             InvoicePermissions.ReportsCurrency,
             InvoicePermissions.ReportsAnalytics
-        }
-    };
+        }),
 
-    /// <summary>Invoice Creator role.</summary>
-    public static readonly RoleRegistration Creator = new()
-    {
-        RoleId = "roles.invoice.creator",
-        Description = "Can create and manage own invoices",
-        PermissionIds = new List<string>
+        (Creator, "Can create and manage own invoices", new[]
         {
             InvoicePermissions.InvoicesCreate,
             InvoicePermissions.InvoicesRead,
@@ -54,29 +51,17 @@ public static class InvoicePredefinedRoles
             InvoicePermissions.SegmentsUpdate,
             InvoicePermissions.FilesUpload,
             InvoicePermissions.FilesRead
-        }
-    };
+        }),
 
-    /// <summary>Invoice Viewer role.</summary>
-    public static readonly RoleRegistration Viewer = new()
-    {
-        RoleId = "roles.invoice.viewer",
-        Description = "Read-only access to invoices",
-        PermissionIds = new List<string>
+        (Viewer, "Read-only access to invoices", new[]
         {
             InvoicePermissions.InvoicesRead,
             InvoicePermissions.SegmentsRead,
             InvoicePermissions.FilesRead,
             InvoicePermissions.ReportsCurrency
-        }
-    };
+        }),
 
-    /// <summary>Invoice Accountant role.</summary>
-    public static readonly RoleRegistration Accountant = new()
-    {
-        RoleId = "roles.invoice.accountant",
-        Description = "Can approve, void, and manage financial aspects",
-        PermissionIds = new List<string>
+        (Accountant, "Can approve, void, and manage financial aspects", new[]
         {
             InvoicePermissions.InvoicesRead,
             InvoicePermissions.InvoicesApprove,
@@ -86,16 +71,6 @@ public static class InvoicePredefinedRoles
             InvoicePermissions.ReportsCurrency,
             InvoicePermissions.ReportsAnalytics,
             InvoicePermissions.ReportsExport
-        }
-    };
-
-    /// <summary>All predefined roles.</summary>
-    public static readonly RoleRegistration[] All = new[]
-    {
-        Admin,
-        Manager,
-        Creator,
-        Viewer,
-        Accountant
+        })
     };
 }
