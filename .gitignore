@@ -1,41 +1,37 @@
 # Build results
+[Bb]in/
+[Oo]bj/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
 x64/
 x86/
+bld/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
-bld/
-[Bb]in/
-[Oo]bj/
 [Ll]og/
 [Ll]ogs/
+out/
+project.assets.json
 
-# Visual Studio
+# IDE files
 .vs/
+.vscode/
+.idea/
+*.swp
+*.swo
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
 *.userprefs
-
-# Rider
-.idea/
 *.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
 
-# Visual Studio Code
-.vscode/
-
-# Test results
-[Tt]est[Rr]esult*/
-[Bb]uild[Ll]og.*
-*.VisualState.xml
-TestResult.xml
-*.trx
-
-# NuGet
+# NuGet Packages
 *.nupkg
 *.snupkg
 **/packages/*
@@ -46,71 +42,54 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
-# MSTest
-*.tmp
+# Environment & Secrets
+**/appsettings.Production.json
+**/appsettings.Staging.json
+**/appsettings.Local.json
+secrets.json
+!appsettings.Development.json
 
-# Coverlet
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+NUL
+
+# Temporary & Logs
+*.log
+*.bak
+*.sql
+*.tmp
+build_errors.txt
+
+# Test Artifacts
+TestResults/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+*.VisualState.xml
+TestResult.xml
 coverage*.json
 coverage*.xml
 coverage*.info
 
-# .NET
-project.assets.json
-project.fragment.lock.json
-
-# Resharper
-_ReSharper*/
-*.[Rr]e[Ss]harper
-*.DotSettings.user
-
-# JetBrains Rider
-*.sln.iml
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Mac
-.DS_Store
-
-# Secrets (should never be committed)
-**/appsettings.Production.json
-**/appsettings.Staging.json
-**/*.Development.json
-!appsettings.Development.json
-secrets.json
-
+# Repository Specific
 .claude/settings.local.json
 .gemini/settings.local.json
-
-# Temporary/debug files
-*.bak
-*.log
-*.sql
-build_errors.txt
-docker-compose.test.yml
-docker-compose.dev.yml
-
-# OpenAPI exports
-*-openapi.json
-*-openapi-*.json
-
-# Temporary tracking docs
 *MIGRATION*.md
 *SUMMARY*.md
 *AUDIT*.md
 *.Improvements.md
 
-# Test Outputs
-*test-output.txt
-*_error.txt
+# OpenAPI & Documentation
+*-openapi.json
+*-openapi-*.json
 
-
-# Test Outputs
-*test-output.txt
-*_error.txt
-
-
-# Windows NUL device file (accidentally created by redirects)
-NUL
+# Enforced Rules (User Request)
+appsettings.Development.json
+docker-compose*.yml
+docker-compose.override.yml
