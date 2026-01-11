@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Maliev.MessagingContracts.Generated;
 using Maliev.InvoiceService.Api.Models.Invoices;
+using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Api.Authorization;
 using Maliev.InvoiceService.Tests.Fixtures;
 using MassTransit.Testing;
@@ -136,13 +137,24 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         // Finalize the invoice first
         await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
+        // Create a payment first
+        var paymentResponse = await _client.PostAsJsonAsync("/invoice/v1/payments", new CreatePaymentRequest
+        {
+            PaymentAmount = 500.00m,
+            PaymentDate = DateTime.UtcNow,
+            PaymentMethod = "BankTransfer",
+            RecordedBy = "test-user"
+        });
+        var createdPayment = await paymentResponse.Content.ReadFromJsonAsync<PaymentResponse>();
+        Assert.NotNull(createdPayment);
+
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
 
         try
         {
             // Act - Link payment
-            var paymentId = Guid.NewGuid();
+            var paymentId = createdPayment.Id;
             var linkRequest = new { PaymentId = paymentId, AllocatedAmount = 500.00m };
             HttpResponseMessage allocateResponse = await _client.PostAsJsonAsync(
                 $"/invoice/v1/payments/invoices/{createdInvoice.Id}/link",
@@ -206,13 +218,24 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         // Finalize the invoice
         await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
 
+        // Create a payment first
+        var paymentResponse = await _client.PostAsJsonAsync("/invoice/v1/payments", new CreatePaymentRequest
+        {
+            PaymentAmount = 107.00m,
+            PaymentDate = DateTime.UtcNow,
+            PaymentMethod = "BankTransfer",
+            RecordedBy = "test-user"
+        });
+        var createdPayment = await paymentResponse.Content.ReadFromJsonAsync<PaymentResponse>();
+        Assert.NotNull(createdPayment);
+
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
 
         try
         {
             // Act - Fully pay the invoice
-            var paymentId = Guid.NewGuid();
+            var paymentId = createdPayment.Id;
             var linkRequest = new { PaymentId = paymentId, AllocatedAmount = 107.00m };
             HttpResponseMessage allocateResponse = await _client.PostAsJsonAsync(
                 $"/invoice/v1/payments/invoices/{createdInvoice.Id}/link",

@@ -1,11 +1,8 @@
 using System.Net;
-using System.Net.Http.Json;
-using Maliev.InvoiceService.Api.Authorization;
 using Maliev.InvoiceService.Tests.Fixtures;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Moq;
-using Moq.Protected;
+using MassTransit.Testing;
+using Maliev.MessagingContracts.Generated;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -23,77 +20,37 @@ public class IAMRegistrationTests
     public async Task Startup_ShouldRegisterPermissionsAndRolesWithIAM()
     {
         // Arrange
-        var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+        var harness = _factory.Services.GetRequiredService<ITestHarness>();
+        await harness.Start();
 
-        // Setup expected responses for permissions registration
-        handlerMock
-            .Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.Is<HttpRequestMessage>(req =>
-                    req.Method == HttpMethod.Post &&
-                    req.RequestUri != null &&
-                    req.RequestUri.AbsolutePath.Contains("/iam/v1/permissions/register")),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = HttpStatusCode.OK,
-                Content = JsonContent.Create(new { message = "Success" })
-            });
-
-        // Setup expected responses for roles registration
-        handlerMock
-            .Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.Is<HttpRequestMessage>(req =>
-                    req.Method == HttpMethod.Post &&
-                    req.RequestUri != null &&
-                    req.RequestUri.AbsolutePath.Contains("/iam/v1/roles/register")),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = HttpStatusCode.OK,
-                Content = JsonContent.Create(new { message = "Success" })
-            });
-
-        var client = _factory.WithWebHostBuilder(builder =>
+        try
         {
-            builder.ConfigureServices(services =>
-            {
-                // Replace the IAM HTTP client with one using our mock handler
-                services.AddHttpClient("IAMService")
-                    .ConfigurePrimaryHttpMessageHandler(() => handlerMock.Object);
-            });
-        }).CreateClient();
+            var client = _factory.CreateClient();
 
-        // Act - Accessing the client triggers host startup and the registration service
-        await client.GetAsync("/invoice/v1/invoices");
+            // Act - Accessing the client triggers host startup and the registration service
+            await client.GetAsync("/invoice/v1/invoices");
 
-        // Wait for background service to trigger (it has a 2s initial delay)
-        await Task.Delay(5000);
+            // Assert - Verify PermissionRegistrationRequest was published
+            // BackgroundIAMRegistrationService waits for app start, then publishes
+            Assert.True(await harness.Published.Any<PermissionRegistrationRequest>(x =>
+                x.Context.Message.ServiceName == "invoice"),
+                "PermissionRegistrationRequest should be published to RabbitMQ");
 
-        // Assert
-        handlerMock.Protected().Verify(
-            "SendAsync",
-            Times.Once(),
-            ItExpr.Is<HttpRequestMessage>(req =>
-                req.Method == HttpMethod.Post &&
-                req.RequestUri != null &&
-                req.RequestUri.AbsolutePath.Contains("/iam/v1/permissions/register")),
-            ItExpr.IsAny<CancellationToken>()
-        );
+            var publishedMessage = harness.Published.Select<PermissionRegistrationRequest>()
+                .FirstOrDefault(x => x.Context.Message.ServiceName == "invoice");
 
-        handlerMock.Protected().Verify(
-            "SendAsync",
-            Times.Once(),
-            ItExpr.Is<HttpRequestMessage>(req =>
-                req.Method == HttpMethod.Post &&
-                req.RequestUri != null &&
-                req.RequestUri.AbsolutePath.Contains("/iam/v1/roles/register")),
-            ItExpr.IsAny<CancellationToken>()
-        );
+            Assert.NotNull(publishedMessage);
+            var request = publishedMessage.Context.Message;
+
+            // Verify content
+            Assert.NotEmpty(request.Permissions);
+            Assert.NotEmpty(request.Roles);
+            Assert.Contains(request.Permissions, p => p.PermissionId == "invoice.invoices.create");
+            Assert.Contains(request.Roles, r => r.RoleId == "roles.invoice.admin");
+        }
+        finally
+        {
+            await harness.Stop();
+        }
     }
 }
