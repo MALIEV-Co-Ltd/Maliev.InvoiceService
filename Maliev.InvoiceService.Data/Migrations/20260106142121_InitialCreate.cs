@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,6 +11,23 @@ namespace Maliev.InvoiceService.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "idempotency_keys",
+                columns: table => new
+                {
+                    key = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    operation = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    resource_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    response = table.Column<string>(type: "jsonb", nullable: false),
+                    status_code = table.Column<int>(type: "integer", nullable: false),
+                    created_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()"),
+                    expires_at = table.Column<DateTime>(type: "timestamptz", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_idempotency_keys", x => new { x.key, x.operation });
+                });
+
             migrationBuilder.CreateTable(
                 name: "invoices",
                 columns: table => new
@@ -42,16 +59,17 @@ namespace Maliev.InvoiceService.Data.Migrations
                     cancelled_at = table.Column<DateTime>(type: "timestamptz", nullable: true),
                     cancelled_by = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     cancellation_reason = table.Column<string>(type: "text", nullable: true),
+                    pdf_file_reference = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     is_deleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    row_version = table.Column<byte[]>(type: "bytea", nullable: false, defaultValueSql: "'\\x0000000000000000'::bytea"),
+                    row_version = table.Column<byte[]>(type: "bytea", nullable: false),
                     created_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()"),
                     updated_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_invoices", x => x.id);
+                    table.PrimaryKey("pk_invoices", x => x.id);
                     table.ForeignKey(
-                        name: "FK_invoices_invoices_parent_invoice_id",
+                        name: "fk_invoices_invoices_parent_invoice_id",
                         column: x => x.parent_invoice_id,
                         principalTable: "invoices",
                         principalColumn: "id",
@@ -73,7 +91,7 @@ namespace Maliev.InvoiceService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_payments", x => x.id);
+                    table.PrimaryKey("pk_payments", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -92,13 +110,37 @@ namespace Maliev.InvoiceService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_audit_logs", x => x.id);
+                    table.PrimaryKey("pk_audit_logs", x => x.id);
                     table.ForeignKey(
-                        name: "FK_audit_logs_invoices_invoice_id",
+                        name: "fk_audit_logs_invoices_invoice_id",
                         column: x => x.invoice_id,
                         principalTable: "invoices",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "file_references",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    invoice_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    file_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    file_url = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    file_size_bytes = table.Column<long>(type: "bigint", nullable: false),
+                    generated_by = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    checksum = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_file_references", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_file_references_invoices_invoice_id",
+                        column: x => x.invoice_id,
+                        principalTable: "invoices",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -123,9 +165,9 @@ namespace Maliev.InvoiceService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_invoice_lines", x => x.id);
+                    table.PrimaryKey("pk_invoice_lines", x => x.id);
                     table.ForeignKey(
-                        name: "FK_invoice_lines_invoices_invoice_id",
+                        name: "fk_invoice_lines_invoices_invoice_id",
                         column: x => x.invoice_id,
                         principalTable: "invoices",
                         principalColumn: "id",
@@ -133,25 +175,28 @@ namespace Maliev.InvoiceService.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "invoice_payments",
+                name: "invoice_payment_allocations",
                 columns: table => new
                 {
                     invoice_id = table.Column<Guid>(type: "uuid", nullable: false),
                     payment_id = table.Column<Guid>(type: "uuid", nullable: false),
                     allocated_amount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    allocation_date = table.Column<DateTime>(type: "timestamptz", nullable: false),
+                    allocation_status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false, defaultValue: "Confirmed"),
+                    allocated_by = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false, defaultValue: "system"),
                     created_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_invoice_payments", x => new { x.invoice_id, x.payment_id });
+                    table.PrimaryKey("pk_invoice_payment_allocations", x => new { x.invoice_id, x.payment_id });
                     table.ForeignKey(
-                        name: "FK_invoice_payments_invoices_invoice_id",
+                        name: "fk_invoice_payment_allocations_invoices_invoice_id",
                         column: x => x.invoice_id,
                         principalTable: "invoices",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_invoice_payments_payments_payment_id",
+                        name: "fk_invoice_payment_allocations_payments_payment_id",
                         column: x => x.payment_id,
                         principalTable: "payments",
                         principalColumn: "id",
@@ -178,7 +223,22 @@ namespace Maliev.InvoiceService.Data.Migrations
                 name: "idx_audit_logs_timestamp",
                 table: "audit_logs",
                 column: "timestamp",
-                descending: new bool[0]);
+                descending: new[] { true });
+
+            migrationBuilder.CreateIndex(
+                name: "idx_file_references_invoice_id",
+                table: "file_references",
+                column: "invoice_id");
+
+            migrationBuilder.CreateIndex(
+                name: "idx_idempotency_keys_expires_at",
+                table: "idempotency_keys",
+                column: "expires_at");
+
+            migrationBuilder.CreateIndex(
+                name: "idx_idempotency_keys_resource_id",
+                table: "idempotency_keys",
+                column: "resource_id");
 
             migrationBuilder.CreateIndex(
                 name: "idx_invoice_lines_invoice_id",
@@ -198,13 +258,13 @@ namespace Maliev.InvoiceService.Data.Migrations
                 filter: "item_code IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "idx_invoice_payments_invoice_amount",
-                table: "invoice_payments",
-                columns: new[] { "invoice_id", "allocated_amount" });
+                name: "idx_invoice_payment_allocations_invoice_status",
+                table: "invoice_payment_allocations",
+                columns: new[] { "invoice_id", "allocation_status" });
 
             migrationBuilder.CreateIndex(
-                name: "idx_invoice_payments_payment_id",
-                table: "invoice_payments",
+                name: "idx_invoice_payment_allocations_payment_id",
+                table: "invoice_payment_allocations",
                 column: "payment_id");
 
             migrationBuilder.CreateIndex(
@@ -234,7 +294,7 @@ namespace Maliev.InvoiceService.Data.Migrations
                 name: "idx_invoices_issue_date",
                 table: "invoices",
                 column: "issue_date",
-                descending: new bool[0]);
+                descending: new[] { true });
 
             migrationBuilder.CreateIndex(
                 name: "idx_invoices_parent_id",
@@ -263,7 +323,7 @@ namespace Maliev.InvoiceService.Data.Migrations
                 name: "idx_payments_payment_date",
                 table: "payments",
                 column: "payment_date",
-                descending: new bool[0]);
+                descending: new[] { true });
 
             migrationBuilder.CreateIndex(
                 name: "idx_payments_reference_number",
@@ -306,58 +366,31 @@ namespace Maliev.InvoiceService.Data.Migrations
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
             ");
-
-            // Create trigger to prevent deletion of finalized invoices
-            migrationBuilder.Sql(@"
-                CREATE OR REPLACE FUNCTION prevent_finalized_deletion()
-                RETURNS TRIGGER AS $$
-                BEGIN
-                    IF OLD.finalized_at IS NOT NULL THEN
-                        RAISE EXCEPTION 'Cannot delete finalized invoice. Use cancellation instead.';
-                    END IF;
-                    RETURN OLD;
-                END;
-                $$ LANGUAGE plpgsql;
-            ");
-
-            migrationBuilder.Sql(@"
-                CREATE TRIGGER trigger_prevent_finalized_deletion
-                BEFORE DELETE ON invoices
-                FOR EACH ROW
-                EXECUTE FUNCTION prevent_finalized_deletion();
-            ");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // Drop triggers first
-            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_prevent_finalized_deletion ON invoices;");
-            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_invoice_lines_updated_at ON invoice_lines;");
-            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_invoices_updated_at ON invoices;");
-
-            // Drop functions
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS prevent_finalized_deletion();");
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS update_updated_at_column();");
-
-            // Drop sequence
-            migrationBuilder.Sql("DROP SEQUENCE IF EXISTS invoice_number_seq;");
-
-            // Drop tables
             migrationBuilder.DropTable(
                 name: "audit_logs");
+
+            migrationBuilder.DropTable(
+                name: "file_references");
+
+            migrationBuilder.DropTable(
+                name: "idempotency_keys");
 
             migrationBuilder.DropTable(
                 name: "invoice_lines");
 
             migrationBuilder.DropTable(
-                name: "invoice_payments");
-
-            migrationBuilder.DropTable(
-                name: "invoices");
+                name: "invoice_payment_allocations");
 
             migrationBuilder.DropTable(
                 name: "payments");
+
+            migrationBuilder.DropTable(
+                name: "invoices");
         }
     }
 }
