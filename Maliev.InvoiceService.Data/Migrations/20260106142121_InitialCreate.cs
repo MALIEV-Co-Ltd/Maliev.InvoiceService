@@ -371,6 +371,17 @@ namespace Maliev.InvoiceService.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Drop triggers first
+            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_invoice_lines_updated_at ON invoice_lines;");
+            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_invoices_updated_at ON invoices;");
+
+            // Drop functions
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS update_updated_at_column();");
+
+            // Drop sequence
+            migrationBuilder.Sql("DROP SEQUENCE IF EXISTS invoice_number_seq;");
+
+            // Drop tables
             migrationBuilder.DropTable(
                 name: "audit_logs");
 

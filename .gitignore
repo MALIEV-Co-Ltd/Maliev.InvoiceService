@@ -47,7 +47,6 @@ artifacts/
 **/appsettings.Staging.json
 **/appsettings.Local.json
 secrets.json
-!appsettings.Development.json
 
 # OS files
 .DS_Store
@@ -90,6 +89,6 @@ coverage*.info
 *-openapi-*.json
 
 # Enforced Rules (User Request)
-appsettings.Development.json
+!appsettings.Development.json
 docker-compose*.yml
 docker-compose.override.yml
