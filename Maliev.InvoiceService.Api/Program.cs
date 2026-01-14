@@ -1,3 +1,4 @@
+#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.InvoiceService.Api.Services.External;
 using Maliev.InvoiceService.Api.Services;
