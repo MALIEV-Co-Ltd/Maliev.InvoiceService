@@ -1,6 +1,6 @@
+using Maliev.InvoiceService.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Maliev.InvoiceService.Data.Models;
 
 namespace Maliev.InvoiceService.Data.Configurations;
 

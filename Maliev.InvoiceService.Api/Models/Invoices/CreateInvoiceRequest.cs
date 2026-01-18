@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text.RegularExpressions;
 
 namespace Maliev.InvoiceService.Api.Models.Invoices;
 
@@ -156,4 +155,3 @@ public class InvoiceLineItemRequest
     [Range(0.0, 100.0)]
     public decimal TaxRate { get; set; } = 7.00m;
 }
-

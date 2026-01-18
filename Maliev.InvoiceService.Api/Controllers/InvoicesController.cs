@@ -1,11 +1,10 @@
 using Asp.Versioning;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Maliev.InvoiceService.Api.Services;
-using Maliev.InvoiceService.Api.Models.Invoices;
-using Maliev.InvoiceService.Api.Models.Common;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.InvoiceService.Api.Authorization;
+using Maliev.InvoiceService.Api.Models.Common;
+using Maliev.InvoiceService.Api.Models.Invoices;
+using Maliev.InvoiceService.Api.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.InvoiceService.Api.Controllers;
 

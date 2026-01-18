@@ -1,7 +1,5 @@
 using Maliev.MessagingContracts.Generated;
-using Maliev.InvoiceService.Api.Models.Invoices;
 using MassTransit;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.InvoiceService.Api.Services.Consumers;
 

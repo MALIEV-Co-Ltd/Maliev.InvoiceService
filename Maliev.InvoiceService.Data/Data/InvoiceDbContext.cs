@@ -1,8 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using Maliev.Aspire.ServiceDefaults.Database;
-using Maliev.InvoiceService.Data.Models;
 using Maliev.InvoiceService.Data.Configurations;
-using Maliev.InvoiceService.Data.Data.Interceptors;
+using Maliev.InvoiceService.Data.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.InvoiceService.Data.Data;
 
