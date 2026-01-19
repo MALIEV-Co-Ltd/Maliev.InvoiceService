@@ -1,5 +1,5 @@
-using Maliev.MessagingContracts.Generated;
 using Maliev.InvoiceService.Data.Data;
+using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 

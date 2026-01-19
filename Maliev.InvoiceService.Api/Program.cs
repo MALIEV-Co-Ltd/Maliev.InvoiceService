@@ -1,11 +1,9 @@
-using Maliev.InvoiceService.Api.Models.Common;
-using Maliev.InvoiceService.Api.Services.External;
-using Maliev.InvoiceService.Api.Services;
 using Maliev.Aspire.ServiceDefaults;
+using Maliev.InvoiceService.Api.Services;
+using Maliev.InvoiceService.Api.Services.External;
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Data.Interceptors;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());

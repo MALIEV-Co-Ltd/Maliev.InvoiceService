@@ -1,8 +1,5 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Maliev.InvoiceService.Api.Authorization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace Maliev.InvoiceService.Api.Authorization;
 
