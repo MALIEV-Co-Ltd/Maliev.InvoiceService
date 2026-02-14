@@ -23,8 +23,9 @@ public class InvoiceServiceTests : IAsyncLifetime
     private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<ICurrencyServiceClient> _currencyClientMock;
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
+    private readonly Mock<IPaymentServiceClient> _paymentClientMock;
     private readonly Mock<IPublishEndpoint> _publishEndpointMock;
-    private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().Build();
+    private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine").Build();
 
     public InvoiceServiceTests()
     {
@@ -32,6 +33,7 @@ public class InvoiceServiceTests : IAsyncLifetime
         _cacheMock = new Mock<IDistributedCache>();
         _currencyClientMock = new Mock<ICurrencyServiceClient>();
         _quotationClientMock = new Mock<IQuotationServiceClient>();
+        _paymentClientMock = new Mock<IPaymentServiceClient>();
         _publishEndpointMock = new Mock<IPublishEndpoint>();
     }
 
@@ -247,6 +249,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _cacheMock.Object,
             _currencyClientMock.Object,
             _quotationClientMock.Object,
+            _paymentClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -304,6 +307,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _cacheMock.Object,
             _currencyClientMock.Object,
             _quotationClientMock.Object,
+            _paymentClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -359,6 +363,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _cacheMock.Object,
             _currencyClientMock.Object,
             _quotationClientMock.Object,
+            _paymentClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -413,6 +418,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _cacheMock.Object,
             _currencyClientMock.Object,
             _quotationClientMock.Object,
+            _paymentClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -465,6 +471,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _cacheMock.Object,
             _currencyClientMock.Object,
             _quotationClientMock.Object,
+            _paymentClientMock.Object,
             _publishEndpointMock.Object
         );
 
