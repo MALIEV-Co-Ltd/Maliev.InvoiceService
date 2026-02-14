@@ -25,7 +25,7 @@ public class InvoiceServiceTests : IAsyncLifetime
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
     private readonly Mock<IPaymentServiceClient> _paymentClientMock;
     private readonly Mock<IPublishEndpoint> _publishEndpointMock;
-    private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().WithName("postgres:18-alpine").Build();
+    private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine").Build();
 
     public InvoiceServiceTests()
     {
