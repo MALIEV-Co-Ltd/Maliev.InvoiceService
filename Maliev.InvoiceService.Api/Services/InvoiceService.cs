@@ -32,6 +32,7 @@ public class InvoiceService : IInvoiceService
     private readonly IDistributedCache _cache;
     private readonly ICurrencyServiceClient _currencyClient;
     private readonly IQuotationServiceClient _quotationClient;
+    private readonly IPaymentServiceClient _paymentClient;
     private readonly IPublishEndpoint _publishEndpoint;
 
     /// <summary>
@@ -42,6 +43,7 @@ public class InvoiceService : IInvoiceService
     /// <param name="cache">Distributed cache for performance optimization.</param>
     /// <param name="currencyClient">Client for retrieving exchange rates from Currency Service.</param>
     /// <param name="quotationClient">Client for retrieving quotation data from Quotation Service.</param>
+    /// <param name="paymentClient">Client for retrieving payment details from Payment Service.</param>
     /// <param name="publishEndpoint">MassTransit publish endpoint for publishing events.</param>
     public InvoiceService(
         InvoiceDbContext context,
@@ -49,6 +51,7 @@ public class InvoiceService : IInvoiceService
         IDistributedCache cache,
         ICurrencyServiceClient currencyClient,
         IQuotationServiceClient quotationClient,
+        IPaymentServiceClient paymentClient,
         IPublishEndpoint publishEndpoint)
     {
         _context = context;
@@ -56,6 +59,7 @@ public class InvoiceService : IInvoiceService
         _cache = cache;
         _currencyClient = currencyClient;
         _quotationClient = quotationClient;
+        _paymentClient = paymentClient;
         _publishEndpoint = publishEndpoint;
     }
 
@@ -1335,7 +1339,31 @@ public class InvoiceService : IInvoiceService
             CreatedAt = DateTime.UtcNow
         }, cancellationToken);
 
-        // TODO: Publish PaymentAllocatedEvent for Financial Service
+        // Publish PaymentAllocatedEvent for Financial Service
+        await _publishEndpoint.Publish(new Maliev.MessagingContracts.Generated.PaymentAllocatedEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "PaymentAllocatedEvent",
+            MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "InvoiceService",
+            ConsumedBy: ["FinancialService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new Maliev.MessagingContracts.Generated.PaymentAllocatedEventPayload(
+                InvoiceId: invoiceId,
+                InvoiceNumber: invoice.InvoiceNumber ?? "UNKNOWN",
+                PaymentId: paymentId,
+                AllocatedAmount: (double)allocatedAmount,
+                Currency: invoice.Currency,
+                CustomerId: invoice.CustomerId,
+                InvoiceStatus: invoice.Status,
+                OutstandingBalance: (double)newOutstandingBalance,
+                AllocatedBy: allocatedBy,
+                AllocatedAt: new DateTimeOffset(allocation.AllocationDate, TimeSpan.Zero)
+            )
+        ), cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -1717,9 +1745,25 @@ public class InvoiceService : IInvoiceService
         };
 
         // Payment delays (average days between due date and payment date)
-        // NOTE: Payment dates are now in Payment Service, so this calculation is simplified
-        // TODO: Integrate with Payment Service to get actual payment dates for delay calculations
-        var paymentDelays = new List<int>();
+        var paidInvoices = await invoicesQuery
+            .Where(i => i.Status == "Paid" || i.Status == "FullyPaid")
+            .Include(i => i.InvoicePaymentAllocations)
+            .ToListAsync(cancellationToken);
+
+        var paymentDelays = new List<double>();
+        foreach (var invoice in paidInvoices)
+        {
+            // Get the date of the last payment allocation as the "paid date"
+            var lastAllocation = invoice.InvoicePaymentAllocations
+                .OrderByDescending(a => a.AllocationDate)
+                .FirstOrDefault();
+
+            if (lastAllocation != null)
+            {
+                var delay = (lastAllocation.AllocationDate.Date - invoice.DueDate.Date).TotalDays;
+                paymentDelays.Add(delay);
+            }
+        }
 
         var averagePaymentDelay = paymentDelays.Any() ? paymentDelays.Average() : 0;
 

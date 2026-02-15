@@ -157,6 +157,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("CORS:AllowedOrigins:0", "http://localhost:3000");
+        builder.UseSetting("Features:FailOpenOnIAMError", "true");
+
         builder.ConfigureAppConfiguration((context, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>

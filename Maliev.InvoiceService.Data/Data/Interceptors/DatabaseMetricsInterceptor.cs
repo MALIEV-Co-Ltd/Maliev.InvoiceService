@@ -10,19 +10,6 @@ namespace Maliev.InvoiceService.Data.Data.Interceptors;
 /// </summary>
 public class DatabaseMetricsInterceptor : DbCommandInterceptor
 {
-    // TODO: Initialize Prometheus metrics in Program.cs
-    // private static readonly Histogram QueryDuration = Metrics.CreateHistogram(
-    //     "invoice_db_query_duration_seconds",
-    //     "Duration of database queries in seconds",
-    //     new HistogramConfiguration { Buckets = Histogram.ExponentialBuckets(0.001, 2, 10) }
-    // );
-    //
-    // private static readonly Counter QueryCount = Metrics.CreateCounter(
-    //     "invoice_db_query_total",
-    //     "Total number of database queries",
-    //     new CounterConfiguration { LabelNames = new[] { "command_type", "status" } }
-    // );
-
     public override DbDataReader ReaderExecuted(
         DbCommand command,
         CommandExecutedEventData eventData,
@@ -63,9 +50,7 @@ public class DatabaseMetricsInterceptor : DbCommandInterceptor
     {
         var commandType = GetCommandType(command.CommandText);
 
-        // TODO: Uncomment when metrics are initialized
-        // QueryDuration.Observe(durationSeconds);
-        // QueryCount.WithLabels(commandType, status).Inc();
+        DatabaseMetrics.RecordQuery(commandType, durationSeconds, status);
 
         // For now, just log to debug
         Debug.WriteLine($"DB Query: {commandType} - {durationSeconds:F3}s - {status}");

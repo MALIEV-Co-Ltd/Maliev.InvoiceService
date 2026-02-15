@@ -39,7 +39,7 @@ try
             );
         });
 
-    builder.AddRedisDistributedCache(instanceName: "invoice:"); // Redis with in-memory fallback
+    builder.AddStandardCache("invoice:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
     builder.AddMassTransitWithRabbitMq(x =>
     {
         x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.FileDeletedEventConsumer>();
@@ -49,7 +49,7 @@ try
     }); // RabbitMQ message bus (non-blocking startup)
 
     // --- API Configuration ---
-    builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    builder.AddStandardCors(); // CORS with fail-fast validation
     builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
