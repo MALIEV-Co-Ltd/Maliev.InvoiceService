@@ -35,6 +35,14 @@ public class TestWebApplicationFactory : BaseIntegrationTestFactory<Program, Inv
         }
         services.AddSingleton<IQuotationServiceClient, MockQuotationServiceClient>();
 
+        // Replace the real Customer Service client with the mock
+        var customerDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICustomerServiceClient));
+        if (customerDescriptor != null)
+        {
+            services.Remove(customerDescriptor);
+        }
+        services.AddSingleton<ICustomerServiceClient, MockCustomerServiceClient>();
+
         // Mock IAM registration service calls to prevent fail-fast startup errors
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock

@@ -173,6 +173,11 @@ public class InvoiceResponse
     /// Gets or sets the list of invoice line items.
     /// </summary>
     public List<InvoiceLineResponse> Lines { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the list of child invoices created via splitting.
+    /// </summary>
+    public List<ChildInvoiceSummary> ChildInvoiceSummaries { get; set; } = new();
 }
 
 /// <summary>

@@ -31,6 +31,9 @@ public class InvoiceDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<FileReference> FileReferences => Set<FileReference>();
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
+    public DbSet<BillingNote> BillingNotes => Set<BillingNote>();
+    public DbSet<BillingNoteInvoice> BillingNoteInvoices => Set<BillingNoteInvoice>();
+    public DbSet<CreditTerm> CreditTerms => Set<CreditTerm>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -49,6 +52,9 @@ public class InvoiceDbContext : DbContext
         modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
         modelBuilder.ApplyConfiguration(new FileReferenceConfiguration());
         modelBuilder.ApplyConfiguration(new IdempotencyKeyConfiguration());
+        modelBuilder.ApplyConfiguration(new BillingNoteConfiguration());
+        modelBuilder.ApplyConfiguration(new BillingNoteInvoiceConfiguration());
+        modelBuilder.ApplyConfiguration(new CreditTermConfiguration());
 
         // Apply PostgreSQL snake_case naming convention globally
         SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);

@@ -3,6 +3,7 @@ using System;
 using Maliev.InvoiceService.Data.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.InvoiceService.Data.Migrations
 {
     [DbContext(typeof(InvoiceDbContext))]
-    partial class InvoiceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260216121304_AddCreditTermCodeToInvoice")]
+    partial class AddCreditTermCodeToInvoice
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -513,8 +516,7 @@ namespace Maliev.InvoiceService.Data.Migrations
                         .HasDefaultValueSql("NOW()");
 
                     b.Property<string>("CreditTermCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasColumnType("text")
                         .HasColumnName("credit_term_code");
 
                     b.Property<string>("Currency")
@@ -661,9 +663,6 @@ namespace Maliev.InvoiceService.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_invoices");
-
-                    b.HasIndex("CreditTermCode")
-                        .HasDatabaseName("ix_invoices_credit_term_code");
 
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("idx_invoices_customer_id");
@@ -954,19 +953,11 @@ namespace Maliev.InvoiceService.Data.Migrations
 
             modelBuilder.Entity("Maliev.InvoiceService.Data.Models.Invoice", b =>
                 {
-                    b.HasOne("Maliev.InvoiceService.Data.Models.CreditTerm", "CreditTerm")
-                        .WithMany()
-                        .HasForeignKey("CreditTermCode")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_invoices_credit_terms_credit_term_code");
-
                     b.HasOne("Maliev.InvoiceService.Data.Models.Invoice", "ParentInvoice")
                         .WithMany("ChildInvoices")
                         .HasForeignKey("ParentInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_invoices_invoices_parent_invoice_id");
-
-                    b.Navigation("CreditTerm");
 
                     b.Navigation("ParentInvoice");
                 });

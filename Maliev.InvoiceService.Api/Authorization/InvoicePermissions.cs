@@ -60,6 +60,22 @@ public static class InvoicePermissions
     /// <summary>Permission to export reports.</summary>
     public const string ReportsExport = "invoice.reports.export";
 
+    // Billing Note Operations
+    /// <summary>Permission to create billing notes.</summary>
+    public const string BillingNotesCreate = "invoice.billing-notes.create";
+    /// <summary>Permission to read billing notes.</summary>
+    public const string BillingNotesRead = "invoice.billing-notes.read";
+    /// <summary>Permission to update billing notes.</summary>
+    public const string BillingNotesUpdate = "invoice.billing-notes.update";
+    /// <summary>Permission to delete billing notes.</summary>
+    public const string BillingNotesDelete = "invoice.billing-notes.delete";
+
+    // Credit Term Operations
+    /// <summary>Permission to read credit terms.</summary>
+    public const string CreditTermsRead = "invoice.credit-terms.read";
+    /// <summary>Permission to manage credit terms.</summary>
+    public const string CreditTermsManage = "invoice.credit-terms.manage";
+
     /// <summary>
     /// Collection of all defined invoice permissions with descriptions.
     /// </summary>
@@ -86,7 +102,13 @@ public static class InvoicePermissions
         { FilesRegister, "Register PDF files (service-to-service)" },
         { ReportsCurrency, "View currency exchange reports" },
         { ReportsAnalytics, "Access invoice analytics" },
-        { ReportsExport, "Export reports" }
+        { ReportsExport, "Export reports" },
+        { BillingNotesCreate, "Create billing notes" },
+        { BillingNotesRead, "Read billing notes" },
+        { BillingNotesUpdate, "Update billing notes" },
+        { BillingNotesDelete, "Delete billing notes" },
+        { CreditTermsRead, "Read credit terms" },
+        { CreditTermsManage, "Manage credit terms" }
     };
 
     /// <summary>

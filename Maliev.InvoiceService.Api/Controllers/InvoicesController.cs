@@ -329,9 +329,13 @@ public class InvoicesController : ControllerBase
     {
         _logger.LogInformation("[{CorrelationId}] Splitting invoice {InvoiceId} into {Count} parts", CorrelationId, id, request.SplitRules.Count);
 
+        // Extract user ID from claims or fallback to request property if we added it (we didn't add SplitBy to request yet, but we could)
+        // For now, let's use the sub claim which is standard.
+        var splitBy = User.FindFirst("sub")?.Value ?? User.FindFirst("uid")?.Value ?? "unknown-user";
+
         try
         {
-            var childInvoices = await _invoiceService.SplitInvoiceAsync(id, request, cancellationToken);
+            var childInvoices = await _invoiceService.SplitInvoiceAsync(id, request, splitBy, cancellationToken);
 
             _logger.LogInformation("[{CorrelationId}] Successfully split invoice {InvoiceId}", CorrelationId, id);
 

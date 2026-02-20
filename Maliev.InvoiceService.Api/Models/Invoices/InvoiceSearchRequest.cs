@@ -99,4 +99,21 @@ public class InvoiceSearchRequest
     /// Gets or sets a value indicating whether to return only overdue invoices.
     /// </summary>
     public bool OnlyOverdue { get; set; } = false;
+
+    // Parent/Child relationship filters
+
+    /// <summary>
+    /// Gets or sets the parent invoice ID for filtering child invoices.
+    /// </summary>
+    public Guid? ParentInvoiceId { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to exclude split parent invoices from results.
+    /// </summary>
+    public bool ExcludeSplitParents { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to return only root invoices (no parent).
+    /// </summary>
+    public bool OnlyRootInvoices { get; set; } = false;
 }

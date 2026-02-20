@@ -62,7 +62,7 @@ public class InvoiceFinalizationTests : BaseIntegrationTest
         Assert.NotNull(finalizedInvoice);
         Assert.Equal("Finalized", finalizedInvoice!.Status);
         Assert.False(string.IsNullOrEmpty(finalizedInvoice.InvoiceNumber));
-        Assert.Matches(@"^INV-\d{8}-\d{6}$", finalizedInvoice.InvoiceNumber);
+        Assert.Matches(@"^(INV|TAX)-\d{8}-\d{6}$", finalizedInvoice.InvoiceNumber);
         Assert.NotNull(finalizedInvoice.FinalizedAt);
         Assert.Equal("test-user", finalizedInvoice.FinalizedBy);
     }

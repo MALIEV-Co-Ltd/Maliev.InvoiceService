@@ -13,6 +13,11 @@ public class SplitInvoiceRequest
     [Required]
     [MinLength(2)]
     public List<InvoiceSplitRule> SplitRules { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the reason for splitting the invoice.
+    /// </summary>
+    public string? Reason { get; set; }
 }
 
 /// <summary>

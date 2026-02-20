@@ -77,6 +77,7 @@ try
     builder.Services.AddMemoryCache();
     // Services
     builder.Services.AddScoped<Maliev.InvoiceService.Api.Services.IInvoiceService, Maliev.InvoiceService.Api.Services.InvoiceService>();
+    builder.Services.AddScoped<Maliev.InvoiceService.Api.Services.IBillingNoteService, Maliev.InvoiceService.Api.Services.BillingNoteService>();
 
     // Background Services
     builder.Services.AddHostedService<Maliev.InvoiceService.Api.Services.BackgroundServices.AuditArchivalService>();
@@ -85,6 +86,7 @@ try
     builder.AddServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService");
     builder.AddServiceClient<IQuotationServiceClient, QuotationServiceClient>("QuotationService");
     builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
+    builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
 
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Maliev.InvoiceService.Api.Program>>();

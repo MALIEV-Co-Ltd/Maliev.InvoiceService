@@ -98,7 +98,7 @@ public class InvoiceEndpointsTests : BaseContractTest
         Assert.NotNull(finalized);
         Assert.Equal("Finalized", finalized!.Status);
         Assert.False(string.IsNullOrEmpty(finalized.InvoiceNumber));
-        Assert.Matches(@"^INV-\d{8}-\d{6}$", finalized.InvoiceNumber);
+        Assert.Matches(@"^(INV|TAX)-\d{8}-\d{6}$", finalized.InvoiceNumber);
         Assert.NotNull(finalized.FinalizedAt);
         Assert.Equal("test-user", finalized.FinalizedBy);
     }

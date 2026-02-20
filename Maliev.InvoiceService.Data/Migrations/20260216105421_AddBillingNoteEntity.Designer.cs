@@ -3,6 +3,7 @@ using System;
 using Maliev.InvoiceService.Data.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.InvoiceService.Data.Migrations
 {
     [DbContext(typeof(InvoiceDbContext))]
-    partial class InvoiceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260216105421_AddBillingNoteEntity")]
+    partial class AddBillingNoteEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -200,185 +203,6 @@ namespace Maliev.InvoiceService.Data.Migrations
                     b.ToTable("billing_note_invoices");
                 });
 
-            modelBuilder.Entity("Maliev.InvoiceService.Data.Models.CreditTerm", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("code");
-
-                    b.Property<int>("Days")
-                        .HasColumnType("integer")
-                        .HasColumnName("days");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.HasKey("Code")
-                        .HasName("pk_credit_terms");
-
-                    b.ToTable("credit_terms");
-
-                    b.HasData(
-                        new
-                        {
-                            Code = "COD",
-                            Days = 0,
-                            Description = "Payment due upon delivery",
-                            IsActive = true,
-                            Name = "Cash on Delivery"
-                        },
-                        new
-                        {
-                            Code = "NET7",
-                            Days = 7,
-                            Description = "Payment due within 7 days",
-                            IsActive = true,
-                            Name = "Net 7"
-                        },
-                        new
-                        {
-                            Code = "NET15",
-                            Days = 15,
-                            Description = "Payment due within 15 days",
-                            IsActive = true,
-                            Name = "Net 15"
-                        },
-                        new
-                        {
-                            Code = "NET30",
-                            Days = 30,
-                            Description = "Payment due within 30 days",
-                            IsActive = true,
-                            Name = "Net 30"
-                        },
-                        new
-                        {
-                            Code = "NET45",
-                            Days = 45,
-                            Description = "Payment due within 45 days",
-                            IsActive = true,
-                            Name = "Net 45"
-                        },
-                        new
-                        {
-                            Code = "NET60",
-                            Days = 60,
-                            Description = "Payment due within 60 days",
-                            IsActive = true,
-                            Name = "Net 60"
-                        },
-                        new
-                        {
-                            Code = "NET90",
-                            Days = 90,
-                            Description = "Payment due within 90 days",
-                            IsActive = true,
-                            Name = "Net 90"
-                        },
-                        new
-                        {
-                            Code = "2/10NET30",
-                            Days = 30,
-                            Description = "2% discount if paid within 10 days",
-                            IsActive = true,
-                            Name = "2% 10 Net 30"
-                        },
-                        new
-                        {
-                            Code = "EOM",
-                            Days = 30,
-                            Description = "Due end of invoice month",
-                            IsActive = true,
-                            Name = "End of Month"
-                        },
-                        new
-                        {
-                            Code = "EOM15",
-                            Days = 45,
-                            Description = "Due 15 days after EOM",
-                            IsActive = true,
-                            Name = "End of Month + 15"
-                        },
-                        new
-                        {
-                            Code = "EOM30",
-                            Days = 60,
-                            Description = "Due 30 days after EOM",
-                            IsActive = true,
-                            Name = "End of Month + 30"
-                        },
-                        new
-                        {
-                            Code = "MFI",
-                            Days = 45,
-                            Description = "Due end of month following invoice",
-                            IsActive = true,
-                            Name = "Month Following Invoice"
-                        },
-                        new
-                        {
-                            Code = "DEPOSIT50",
-                            Days = 0,
-                            Description = "50% upfront, balance on delivery",
-                            IsActive = true,
-                            Name = "50% Deposit"
-                        },
-                        new
-                        {
-                            Code = "DEPOSIT30",
-                            Days = 0,
-                            Description = "30% upfront, balance on delivery",
-                            IsActive = true,
-                            Name = "30% Deposit"
-                        },
-                        new
-                        {
-                            Code = "MILESTONE",
-                            Days = 0,
-                            Description = "Payment per milestone",
-                            IsActive = true,
-                            Name = "Milestone"
-                        },
-                        new
-                        {
-                            Code = "CIA",
-                            Days = 0,
-                            Description = "Full payment before work begins",
-                            IsActive = true,
-                            Name = "Cash in Advance"
-                        },
-                        new
-                        {
-                            Code = "CBD",
-                            Days = 0,
-                            Description = "Payment required before shipment",
-                            IsActive = true,
-                            Name = "Cash Before Delivery"
-                        },
-                        new
-                        {
-                            Code = "PREPAID",
-                            Days = 0,
-                            Description = "Full payment before invoice",
-                            IsActive = true,
-                            Name = "Prepaid"
-                        });
-                });
-
             modelBuilder.Entity("Maliev.InvoiceService.Data.Models.FileReference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -511,11 +335,6 @@ namespace Maliev.InvoiceService.Data.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CreditTermCode")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("credit_term_code");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -661,9 +480,6 @@ namespace Maliev.InvoiceService.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_invoices");
-
-                    b.HasIndex("CreditTermCode")
-                        .HasDatabaseName("ix_invoices_credit_term_code");
 
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("idx_invoices_customer_id");
@@ -954,19 +770,11 @@ namespace Maliev.InvoiceService.Data.Migrations
 
             modelBuilder.Entity("Maliev.InvoiceService.Data.Models.Invoice", b =>
                 {
-                    b.HasOne("Maliev.InvoiceService.Data.Models.CreditTerm", "CreditTerm")
-                        .WithMany()
-                        .HasForeignKey("CreditTermCode")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_invoices_credit_terms_credit_term_code");
-
                     b.HasOne("Maliev.InvoiceService.Data.Models.Invoice", "ParentInvoice")
                         .WithMany("ChildInvoices")
                         .HasForeignKey("ParentInvoiceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_invoices_invoices_parent_invoice_id");
-
-                    b.Navigation("CreditTerm");
 
                     b.Navigation("ParentInvoice");
                 });

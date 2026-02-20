@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Maliev.InvoiceService.Api.Models.Common;
+using Maliev.InvoiceService.Data.Models;
 
 namespace Maliev.InvoiceService.Api.Models.Invoices;
 
@@ -7,6 +9,11 @@ namespace Maliev.InvoiceService.Api.Models.Invoices;
 /// </summary>
 public class CreateInvoiceRequest
 {
+    /// <summary>
+    /// Gets or sets the document type (TaxInvoice, Invoice, CreditNote, DebitNote).
+    /// </summary>
+    public DocumentType DocumentType { get; set; } = DocumentType.TaxInvoice;
+
     /// <summary>
     /// Gets or sets the quotation reference number if this invoice is generated from a quotation.
     /// </summary>
@@ -17,6 +24,13 @@ public class CreateInvoiceRequest
     /// </summary>
     [Required]
     public Guid CustomerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the billing identity type (Personal or Corporate).
+    /// Determines whether to use customer's Thai National ID or company's tax ID.
+    /// </summary>
+    [Required]
+    public BillingIdentityType BillingIdentityType { get; set; } = BillingIdentityType.Corporate;
 
     /// <summary>
     /// Gets or sets the customer's name.
@@ -74,6 +88,11 @@ public class CreateInvoiceRequest
     /// </summary>
     [Range(1, 365)]
     public int PaymentTermsDays { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the credit term code (e.g., "NET30").
+    /// </summary>
+    public string? CreditTermCode { get; set; }
 
     /// <summary>
     /// Gets or sets the late fee percentage applied to overdue invoices.

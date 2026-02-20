@@ -17,6 +17,11 @@ public class Invoice
     public string? InvoiceNumber { get; set; }
 
     /// <summary>
+    /// Type of billing document (TaxInvoice, Invoice, CreditNote, DebitNote).
+    /// </summary>
+    public DocumentType DocumentType { get; set; } = DocumentType.TaxInvoice;
+
+    /// <summary>
     /// Foreign key to parent invoice (for split invoices)
     /// </summary>
     public Guid? ParentInvoiceId { get; set; }
@@ -110,6 +115,16 @@ public class Invoice
     /// Number of days for payment (e.g., 30, 60, 90)
     /// </summary>
     public int PaymentTermsDays { get; set; } = 30;
+
+    /// <summary>
+    /// Credit term code (e.g., "NET30"). FK reference to CreditTerm entity.
+    /// </summary>
+    public string? CreditTermCode { get; set; }
+
+    /// <summary>
+    /// Navigation property to the associated credit term.
+    /// </summary>
+    public CreditTerm? CreditTerm { get; set; }
 
     /// <summary>
     /// Late payment fee percentage

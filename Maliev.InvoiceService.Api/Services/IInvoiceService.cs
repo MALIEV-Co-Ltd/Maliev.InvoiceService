@@ -97,10 +97,11 @@ public interface IInvoiceService
     /// </summary>
     /// <param name="id">Invoice ID to split.</param>
     /// <param name="request">Split request with percentage rules for each new invoice.</param>
+    /// <param name="splitBy">User performing the split.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of newly created split invoices.</returns>
     /// <exception cref="InvalidOperationException">If invoice is not in Finalized status or split percentages don't sum to 100%.</exception>
-    Task<List<InvoiceResponse>> SplitInvoiceAsync(Guid id, SplitInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<List<InvoiceResponse>> SplitInvoiceAsync(Guid id, SplitInvoiceRequest request, string splitBy, CancellationToken cancellationToken = default);
 
     // Export operations
 

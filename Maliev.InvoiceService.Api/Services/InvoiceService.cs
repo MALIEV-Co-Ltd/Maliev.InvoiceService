@@ -1,5 +1,6 @@
 using Maliev.InvoiceService.Api.Models.Audit;
 using Maliev.InvoiceService.Api.Models.Common;
+using Maliev.InvoiceService.Api.Models.Customers;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Api.Services.External;
@@ -9,6 +10,7 @@ using Maliev.MessagingContracts.Generated;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Json;
 
@@ -33,6 +35,7 @@ public class InvoiceService : IInvoiceService
     private readonly ICurrencyServiceClient _currencyClient;
     private readonly IQuotationServiceClient _quotationClient;
     private readonly IPaymentServiceClient _paymentClient;
+    private readonly ICustomerServiceClient _customerClient;
     private readonly IPublishEndpoint _publishEndpoint;
 
     /// <summary>
@@ -44,6 +47,7 @@ public class InvoiceService : IInvoiceService
     /// <param name="currencyClient">Client for retrieving exchange rates from Currency Service.</param>
     /// <param name="quotationClient">Client for retrieving quotation data from Quotation Service.</param>
     /// <param name="paymentClient">Client for retrieving payment details from Payment Service.</param>
+    /// <param name="customerClient">Client for retrieving customer data from Customer Service.</param>
     /// <param name="publishEndpoint">MassTransit publish endpoint for publishing events.</param>
     public InvoiceService(
         InvoiceDbContext context,
@@ -52,6 +56,7 @@ public class InvoiceService : IInvoiceService
         ICurrencyServiceClient currencyClient,
         IQuotationServiceClient quotationClient,
         IPaymentServiceClient paymentClient,
+        ICustomerServiceClient customerClient,
         IPublishEndpoint publishEndpoint)
     {
         _context = context;
@@ -60,6 +65,7 @@ public class InvoiceService : IInvoiceService
         _currencyClient = currencyClient;
         _quotationClient = quotationClient;
         _paymentClient = paymentClient;
+        _customerClient = customerClient;
         _publishEndpoint = publishEndpoint;
     }
 
@@ -107,6 +113,45 @@ public class InvoiceService : IInvoiceService
             }
         }
 
+        // Validate billing identity and fetch customer data
+        var customer = await _customerClient.GetCustomerByIdAsync(request.CustomerId, cancellationToken);
+        if (customer == null)
+        {
+            throw new ValidationException($"Customer {request.CustomerId} not found");
+        }
+
+        string billingName;
+        string billingTaxId;
+
+        if (request.BillingIdentityType == BillingIdentityType.Personal)
+        {
+            if (string.IsNullOrEmpty(customer.ThaiNationalIdMasked))
+            {
+                throw new ValidationException("Customer does not have a Thai National ID. Cannot create invoice with personal billing identity.");
+            }
+
+            billingName = $"{customer.FirstName} {customer.LastName}";
+            // Note: We use the masked ID from the API response since full ID is not exposed for security
+            // The actual Thai National ID will be fetched from CustomerService for PDF generation
+            billingTaxId = "PersonalID"; // Placeholder - will be resolved during PDF generation
+            _logger.LogInformation("Creating invoice with Personal billing identity for customer {CustomerId}", request.CustomerId);
+        }
+        else // Corporate
+        {
+            if (customer.CompanyId == null || string.IsNullOrEmpty(customer.CompanyName))
+            {
+                throw new ValidationException("Customer does not have a linked company. Cannot create invoice with corporate billing identity.");
+            }
+
+            billingName = customer.CompanyName;
+            billingTaxId = request.CustomerTaxId; // Company tax ID should come from request or be fetched
+            _logger.LogInformation("Creating invoice with Corporate billing identity for customer {CustomerId}", request.CustomerId);
+        }
+
+        // Override request values with validated billing identity
+        request.CustomerName = billingName;
+        request.CustomerTaxId = billingTaxId;
+
         var invoice = new Invoice
         {
             Id = Guid.NewGuid(),
@@ -117,10 +162,12 @@ public class InvoiceService : IInvoiceService
             BillingAddress = request.BillingAddress,
             ShippingAddress = request.ShippingAddress,
             PoNumber = request.PoNumber,
+            DocumentType = request.DocumentType,
             Currency = request.Currency,
             IssueDate = request.IssueDate.Date,
             DueDate = request.DueDate.Date,
             PaymentTermsDays = request.PaymentTermsDays,
+            CreditTermCode = request.CreditTermCode,
             LateFeePercentage = request.LateFeePercentage,
             Status = "Draft",
             CreatedAt = DateTime.UtcNow,
@@ -254,6 +301,7 @@ public class InvoiceService : IInvoiceService
 
         var invoice = await _context.Invoices
             .Include(i => i.Lines)
+            .Include(i => i.ChildInvoices) // Include child invoices
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, cancellationToken);
 
@@ -400,6 +448,23 @@ public class InvoiceService : IInvoiceService
         {
             var today = DateTime.UtcNow.Date;
             query = query.Where(i => i.DueDate < today && i.Status != "Paid" && i.Status != "Cancelled");
+        }
+
+        // Parent/Child filters
+        if (request.ParentInvoiceId.HasValue)
+        {
+            query = query.Where(i => i.ParentInvoiceId == request.ParentInvoiceId.Value);
+        }
+
+        if (request.ExcludeSplitParents)
+        {
+            // Assuming "Split" status indicates a parent that has been split
+            query = query.Where(i => i.Status != "Split");
+        }
+
+        if (request.OnlyRootInvoices)
+        {
+            query = query.Where(i => i.ParentInvoiceId == null);
         }
 
         // Get total count before sorting and pagination
@@ -778,7 +843,16 @@ public class InvoiceService : IInvoiceService
 
         var nextSeq = Convert.ToInt64(result);
 
-        invoice.InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{nextSeq:D6}";
+        var prefix = invoice.DocumentType switch
+        {
+            DocumentType.TaxInvoice => "TAX",
+            DocumentType.Invoice => "INV",
+            DocumentType.CreditNote => "CN",
+            DocumentType.DebitNote => "DN",
+            _ => "INV"
+        };
+
+        invoice.InvoiceNumber = $"{prefix}-{DateTime.UtcNow:yyyyMMdd}-{nextSeq:D6}";
         invoice.Status = "Finalized";
         invoice.FinalizedAt = DateTime.UtcNow;
         invoice.FinalizedBy = finalizedBy;
@@ -1026,15 +1100,18 @@ public class InvoiceService : IInvoiceService
     }
 
     /// <inheritdoc/>
-    public async Task<List<InvoiceResponse>> SplitInvoiceAsync(Guid id, SplitInvoiceRequest request, CancellationToken cancellationToken = default)
+    public async Task<List<InvoiceResponse>> SplitInvoiceAsync(Guid id, SplitInvoiceRequest request, string splitBy, CancellationToken cancellationToken = default)
     {
         var parentInvoice = await _context.Invoices
             .Include(i => i.Lines)
             .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, cancellationToken)
             ?? throw new KeyNotFoundException($"Invoice {id} not found");
 
+        if (parentInvoice.Status == "Split")
+            throw new InvalidOperationException("Invoice has already been split. You cannot split an invoice more than once.");
+
         if (parentInvoice.Status != "Finalized")
-            throw new InvalidOperationException("Only finalized invoices can be split");
+            throw new InvalidOperationException($"Only finalized invoices can be split. Current status: {parentInvoice.Status}");
 
         // Validate split rules
         var totalPercentage = request.SplitRules.Sum(r => r.Percentage);
@@ -1043,6 +1120,7 @@ public class InvoiceService : IInvoiceService
 
         var childInvoices = new List<Invoice>();
 
+        // Execution strategy for raw SQL sequence generation
         if (_context.Database.GetDbConnection().State != System.Data.ConnectionState.Open)
         {
             await _context.Database.OpenConnectionAsync(cancellationToken);
@@ -1073,13 +1151,13 @@ public class InvoiceService : IInvoiceService
                     ExchangeRate = parentInvoice.ExchangeRate,
                     ExchangeRateSource = parentInvoice.ExchangeRateSource,
                     IssueDate = parentInvoice.IssueDate,
-                    DueDate = parentInvoice.DueDate,
+                    DueDate = parentInvoice.DueDate, // Can be overridden if rules allowed different due dates, but currently inherits
                     PaymentTermsDays = parentInvoice.PaymentTermsDays,
                     LateFeePercentage = parentInvoice.LateFeePercentage,
                     InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{nextSeq:D6}",
-                    Status = "Finalized",
+                    Status = "Finalized", // Child invoices start as Finalized
                     FinalizedAt = DateTime.UtcNow,
-                    FinalizedBy = "system-split",
+                    FinalizedBy = splitBy, // Use the actual user
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     RowVersion = new byte[8]
@@ -1125,26 +1203,85 @@ public class InvoiceService : IInvoiceService
             await _context.Database.CloseConnectionAsync();
         }
 
-        // T112: Reconcile rounding errors by adjusting the last child invoice
-        if (childInvoices.Count > 0)
+        // Add child invoices to context
+        _context.Invoices.AddRange(childInvoices);
+
+        // Update parent status
+        parentInvoice.Status = "Split";
+        parentInvoice.UpdatedAt = DateTime.UtcNow;
+
+        // Add audit logs
+        var parentAudit = new AuditLog
         {
-            var lastChild = childInvoices.Last();
-            lastChild.Subtotal = parentInvoice.Subtotal - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.Subtotal);
-            lastChild.TaxAmount = parentInvoice.TaxAmount - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.TaxAmount);
-            lastChild.WithholdingTaxAmount = parentInvoice.WithholdingTaxAmount - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.WithholdingTaxAmount);
-            lastChild.GrandTotal = parentInvoice.GrandTotal - childInvoices.Take(childInvoices.Count - 1).Sum(c => c.GrandTotal);
+            Id = Guid.NewGuid(),
+            InvoiceId = parentInvoice.Id,
+            EventType = "Split",
+            ChangedFields = JsonSerializer.Serialize(new
+            {
+                ChildInvoiceIds = childInvoices.Select(c => c.Id).ToList(),
+                Reason = request.Reason
+            }),
+            ActorId = splitBy,
+            Timestamp = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.AuditLogs.Add(parentAudit);
+
+        foreach (var child in childInvoices)
+        {
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                InvoiceId = child.Id,
+                EventType = "Created",
+                ChangedFields = JsonSerializer.Serialize(new
+                {
+                    Reason = $"Split from {parentInvoice.InvoiceNumber} ({child.GrandTotal / parentInvoice.GrandTotal * 100:F2}%)",
+                    ParentInvoiceId = parentInvoice.Id
+                }),
+                ActorId = splitBy,
+                Timestamp = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            });
         }
 
-        _context.Invoices.AddRange(childInvoices);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Record metrics
-        InvoiceMetrics.RecordInvoiceSplitOperation(true);
+        _logger.LogInformation("Split invoice {ParentId} into {Count} children by {User}", parentInvoice.Id, childInvoices.Count, splitBy);
 
-        _logger.LogInformation("Split invoice {ParentInvoiceId} into {Count} child invoices", id, childInvoices.Count);
+        // Publish InvoiceSplitEvent
+        var evt = new InvoiceSplitEvent(
+            MessageId: Guid.NewGuid(),
+            MessageName: "InvoiceSplitEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "InvoiceService",
+            ConsumedBy: ["AccountingService", "NotificationService", "AnalyticsService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new InvoiceSplitEventPayload(
+                ChildInvoices: childInvoices.Select(c => new InvoiceSplitEventPayloadChildInvoicesItem(
+                    Id: c.Id,
+                    InvoiceNumber: c.InvoiceNumber ?? "UNKNOWN",
+                    GrandTotal: (double)c.GrandTotal,
+                    Percentage: (double)(childInvoices.IndexOf(c) < request.SplitRules.Count ? request.SplitRules[childInvoices.IndexOf(c)].Percentage : 0)
+                )).ToList(),
+                ParentInvoiceId: parentInvoice.Id,
+                ParentInvoiceNumber: parentInvoice.InvoiceNumber ?? "UNKNOWN",
+                SplitBy: splitBy,
+                SplitAt: DateTimeOffset.UtcNow,
+                Reason: request.Reason ?? "Manual Split"
+            )
+        );
+
+        await _publishEndpoint.Publish(evt, cancellationToken);
 
         return childInvoices.Select(MapToResponse).ToList();
     }
+
+
 
     /// <inheritdoc/>
     public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken = default)
@@ -1207,7 +1344,7 @@ public class InvoiceService : IInvoiceService
             .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, cancellationToken)
             ?? throw new KeyNotFoundException($"Invoice {invoiceId} not found");
 
-        if (invoice.Status == "Draft" || invoice.Status == "Cancelled")
+        if (invoice.Status == "Draft" || invoice.Status == "Cancelled" || invoice.Status == "Split")
         {
             throw new InvalidOperationException($"Cannot allocate payment to invoice with status {invoice.Status}");
         }
@@ -1484,6 +1621,14 @@ public class InvoiceService : IInvoiceService
                 LineSubtotal = l.LineSubtotal,
                 TaxAmount = l.TaxAmount,
                 LineTotal = l.LineTotal
+            }).ToList(),
+            ChildInvoiceSummaries = invoice.ChildInvoices.Select(c => new ChildInvoiceSummary
+            {
+                Id = c.Id,
+                InvoiceNumber = c.InvoiceNumber,
+                GrandTotal = c.GrandTotal,
+                Status = c.Status,
+                DueDate = c.DueDate
             }).ToList()
         };
     }

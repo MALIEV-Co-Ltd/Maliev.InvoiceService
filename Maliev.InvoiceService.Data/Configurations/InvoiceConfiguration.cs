@@ -148,6 +148,16 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasDefaultValue(30)
             .IsRequired();
 
+        builder.Property(i => i.CreditTermCode)
+            .HasColumnName("credit_term_code")
+            .HasMaxLength(20);
+        builder.HasOne(i => i.CreditTerm)
+            .WithMany()
+            .HasForeignKey(i => i.CreditTermCode)
+            .HasPrincipalKey(ct => ct.Code)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.Property(i => i.LateFeePercentage)
             .HasColumnName("late_fee_percentage")
             .HasColumnType("decimal(5,2)");

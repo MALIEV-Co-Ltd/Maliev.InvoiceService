@@ -24,6 +24,7 @@ public class InvoiceServiceTests : IAsyncLifetime
     private readonly Mock<ICurrencyServiceClient> _currencyClientMock;
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
     private readonly Mock<IPaymentServiceClient> _paymentClientMock;
+    private readonly Mock<ICustomerServiceClient> _customerClientMock;
     private readonly Mock<IPublishEndpoint> _publishEndpointMock;
     private static readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder().WithImage("postgres:18-alpine").Build();
 
@@ -34,6 +35,7 @@ public class InvoiceServiceTests : IAsyncLifetime
         _currencyClientMock = new Mock<ICurrencyServiceClient>();
         _quotationClientMock = new Mock<IQuotationServiceClient>();
         _paymentClientMock = new Mock<IPaymentServiceClient>();
+        _customerClientMock = new Mock<ICustomerServiceClient>();
         _publishEndpointMock = new Mock<IPublishEndpoint>();
     }
 
@@ -250,6 +252,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _currencyClientMock.Object,
             _quotationClientMock.Object,
             _paymentClientMock.Object,
+            _customerClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -308,6 +311,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _currencyClientMock.Object,
             _quotationClientMock.Object,
             _paymentClientMock.Object,
+            _customerClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -364,6 +368,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _currencyClientMock.Object,
             _quotationClientMock.Object,
             _paymentClientMock.Object,
+            _customerClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -412,6 +417,17 @@ public class InvoiceServiceTests : IAsyncLifetime
             .Setup(x => x.GetExchangeRateAsync("USD", "THB", It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(35.50m);
 
+        _customerClientMock
+            .Setup(x => x.GetCustomerByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Maliev.InvoiceService.Api.Models.Customers.CustomerResponse
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Test",
+                LastName = "Customer",
+                CompanyId = Guid.NewGuid(),
+                CompanyName = "Test Company"
+            });
+
         var service = new Api.Services.InvoiceService(
             context,
             _loggerMock.Object,
@@ -419,6 +435,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _currencyClientMock.Object,
             _quotationClientMock.Object,
             _paymentClientMock.Object,
+            _customerClientMock.Object,
             _publishEndpointMock.Object
         );
 
@@ -465,6 +482,17 @@ public class InvoiceServiceTests : IAsyncLifetime
         await using var context = CreateDbContext();
         await using var transaction = await context.Database.BeginTransactionAsync();
 
+        _customerClientMock
+            .Setup(x => x.GetCustomerByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Maliev.InvoiceService.Api.Models.Customers.CustomerResponse
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Test",
+                LastName = "Customer",
+                CompanyId = Guid.NewGuid(),
+                CompanyName = "Test Company"
+            });
+
         var service = new Api.Services.InvoiceService(
             context,
             _loggerMock.Object,
@@ -472,6 +500,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             _currencyClientMock.Object,
             _quotationClientMock.Object,
             _paymentClientMock.Object,
+            _customerClientMock.Object,
             _publishEndpointMock.Object
         );
 
