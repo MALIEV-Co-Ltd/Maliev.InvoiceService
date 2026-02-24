@@ -2,6 +2,7 @@ using Moq;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Uploads;
 using Maliev.InvoiceService.Api.Services.Consumers;
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Models;

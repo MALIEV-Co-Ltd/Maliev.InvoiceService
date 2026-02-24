@@ -1,4 +1,5 @@
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Payments;
 using MassTransit;
 
 namespace Maliev.InvoiceService.Api.Services.Consumers;

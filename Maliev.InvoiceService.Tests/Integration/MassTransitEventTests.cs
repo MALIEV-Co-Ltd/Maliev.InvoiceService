@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.MessagingContracts.Generated;
 using Maliev.InvoiceService.Api.Models.Invoices;
 using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Api.Authorization;
@@ -8,6 +7,11 @@ using Maliev.InvoiceService.Tests.Fixtures;
 using MassTransit.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Maliev.MessagingContracts.Contracts.Invoices;
+using Maliev.MessagingContracts.Contracts.Payments;
+using Maliev.MessagingContracts.Contracts.Orders;
+using Maliev.MessagingContracts.Contracts.Pdf;
+using Maliev.MessagingContracts.Generated;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 

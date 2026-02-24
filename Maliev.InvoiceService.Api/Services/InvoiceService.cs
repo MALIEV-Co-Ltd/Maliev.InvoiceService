@@ -7,6 +7,9 @@ using Maliev.InvoiceService.Api.Services.External;
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Models;
 using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts.Contracts.Invoices;
+using Maliev.MessagingContracts.Contracts.Payments;
+using Maliev.MessagingContracts.Contracts.Pdf;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -261,11 +264,11 @@ public class InvoiceService : IInvoiceService
         // Publish InvoiceCreatedEvent
         await _publishEndpoint.Publish(new InvoiceCreatedEvent(
             MessageId: Guid.NewGuid(),
-            MessageName: "InvoiceCreatedEvent",
+            MessageName: nameof(InvoiceCreatedEvent),
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: ["NotificationService", "AnalyticsService"],
+            ConsumedBy: new List<string> { "NotificationService", "AnalyticsService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,
@@ -936,11 +939,11 @@ public class InvoiceService : IInvoiceService
         Guid.TryParse(cancelledBy, out var cancelledByIdParsed);
         await _publishEndpoint.Publish(new InvoiceCancelledEvent(
             MessageId: Guid.NewGuid(),
-            MessageName: "InvoiceCancelledEvent",
+            MessageName: nameof(InvoiceCancelledEvent),
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: ["PaymentService", "NotificationService", "AnalyticsService"],
+            ConsumedBy: new List<string> { "PaymentService", "NotificationService", "AnalyticsService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,
@@ -1252,24 +1255,24 @@ public class InvoiceService : IInvoiceService
         // Publish InvoiceSplitEvent
         var evt = new InvoiceSplitEvent(
             MessageId: Guid.NewGuid(),
-            MessageName: "InvoiceSplitEvent",
+            MessageName: nameof(InvoiceSplitEvent),
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: ["AccountingService", "NotificationService", "AnalyticsService"],
+            ConsumedBy: new List<string> { "AccountingService", "NotificationService", "AnalyticsService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,
             IsPublic: false,
             Payload: new InvoiceSplitEventPayload(
+                ParentInvoiceId: parentInvoice.Id,
+                ParentInvoiceNumber: parentInvoice.InvoiceNumber ?? "UNKNOWN",
                 ChildInvoices: childInvoices.Select(c => new InvoiceSplitEventPayloadChildInvoicesItem(
                     Id: c.Id,
                     InvoiceNumber: c.InvoiceNumber ?? "UNKNOWN",
                     GrandTotal: (double)c.GrandTotal,
                     Percentage: (double)(childInvoices.IndexOf(c) < request.SplitRules.Count ? request.SplitRules[childInvoices.IndexOf(c)].Percentage : 0)
                 )).ToList(),
-                ParentInvoiceId: parentInvoice.Id,
-                ParentInvoiceNumber: parentInvoice.InvoiceNumber ?? "UNKNOWN",
                 SplitBy: splitBy,
                 SplitAt: DateTimeOffset.UtcNow,
                 Reason: request.Reason ?? "Manual Split"
@@ -1407,11 +1410,11 @@ public class InvoiceService : IInvoiceService
         Guid.TryParse(allocatedBy, out var allocatedByIdParsed);
         await _publishEndpoint.Publish(new InvoicePaymentReceivedEvent(
             MessageId: Guid.NewGuid(),
-            MessageName: "InvoicePaymentReceivedEvent",
+            MessageName: nameof(InvoicePaymentReceivedEvent),
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: ["NotificationService", "AnalyticsService"],
+            ConsumedBy: new List<string> { "NotificationService", "AnalyticsService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,
@@ -1433,11 +1436,11 @@ public class InvoiceService : IInvoiceService
         {
             await _publishEndpoint.Publish(new InvoiceFullyPaidEvent(
                 MessageId: Guid.NewGuid(),
-                MessageName: "InvoiceFullyPaidEvent",
+                MessageName: nameof(InvoiceFullyPaidEvent),
                 MessageType: MessageType.Event,
                 MessageVersion: "1.0.0",
                 PublishedBy: "InvoiceService",
-                ConsumedBy: ["NotificationService", "AnalyticsService"],
+                ConsumedBy: new List<string> { "NotificationService", "AnalyticsService" },
                 CorrelationId: Guid.NewGuid(),
                 CausationId: null,
                 OccurredAtUtc: DateTimeOffset.UtcNow,
@@ -1477,18 +1480,18 @@ public class InvoiceService : IInvoiceService
         }, cancellationToken);
 
         // Publish PaymentAllocatedEvent for Financial Service
-        await _publishEndpoint.Publish(new Maliev.MessagingContracts.Generated.PaymentAllocatedEvent(
+        await _publishEndpoint.Publish(new PaymentAllocatedEvent(
             MessageId: Guid.NewGuid(),
-            MessageName: "PaymentAllocatedEvent",
-            MessageType: Maliev.MessagingContracts.Generated.MessageType.Event,
+            MessageName: nameof(PaymentAllocatedEvent),
+            MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: ["FinancialService"],
+            ConsumedBy: new List<string> { "FinancialService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,
             IsPublic: false,
-            Payload: new Maliev.MessagingContracts.Generated.PaymentAllocatedEventPayload(
+            Payload: new PaymentAllocatedEventPayload(
                 InvoiceId: invoiceId,
                 InvoiceNumber: invoice.InvoiceNumber ?? "UNKNOWN",
                 PaymentId: paymentId,
@@ -1718,11 +1721,11 @@ public class InvoiceService : IInvoiceService
         // Publish InvoiceGeneratedEvent
         await _publishEndpoint.Publish(new InvoiceGeneratedEvent(
             MessageId: Guid.NewGuid(),
-            MessageName: "InvoiceGeneratedEvent",
+            MessageName: nameof(InvoiceGeneratedEvent),
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: ["NotificationService"],
+            ConsumedBy: new List<string> { "NotificationService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,
