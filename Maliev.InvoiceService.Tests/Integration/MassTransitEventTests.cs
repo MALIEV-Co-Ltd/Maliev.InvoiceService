@@ -11,7 +11,7 @@ using Maliev.MessagingContracts.Contracts.Invoices;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.MessagingContracts.Contracts.Pdf;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 

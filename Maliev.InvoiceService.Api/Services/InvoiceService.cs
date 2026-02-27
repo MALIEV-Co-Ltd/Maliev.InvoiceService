@@ -6,7 +6,7 @@ using Maliev.InvoiceService.Api.Models.Payments;
 using Maliev.InvoiceService.Api.Services.External;
 using Maliev.InvoiceService.Data.Data;
 using Maliev.InvoiceService.Data.Models;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Invoices;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.MessagingContracts.Contracts.Pdf;

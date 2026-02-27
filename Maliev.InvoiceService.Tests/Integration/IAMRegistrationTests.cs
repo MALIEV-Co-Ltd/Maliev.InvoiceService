@@ -2,7 +2,7 @@ using System.Net;
 using Maliev.InvoiceService.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
 using MassTransit.Testing;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Iam;
 
 namespace Maliev.InvoiceService.Tests.Integration;
