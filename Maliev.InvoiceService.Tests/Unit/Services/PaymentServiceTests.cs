@@ -1,4 +1,4 @@
-using Maliev.InvoiceService.Data.Models;
+using Maliev.InvoiceService.Domain.Entities;
 
 namespace Maliev.InvoiceService.Tests.Unit.Services;
 

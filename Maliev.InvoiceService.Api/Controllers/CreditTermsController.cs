@@ -1,8 +1,8 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.InvoiceService.Api.Authorization;
-using Maliev.InvoiceService.Data.Data;
-using Maliev.InvoiceService.Data.Models;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

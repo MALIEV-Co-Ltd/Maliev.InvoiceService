@@ -1,5 +1,5 @@
-using Maliev.InvoiceService.Data.Data;
-using Maliev.InvoiceService.Api.Services.External;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Application.Services.External;
 using Maliev.InvoiceService.Tests.Mocks;
 using Maliev.InvoiceService.Tests.Testing;
 using Microsoft.Extensions.DependencyInjection;

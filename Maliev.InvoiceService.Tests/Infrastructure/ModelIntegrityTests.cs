@@ -1,4 +1,4 @@
-using Maliev.InvoiceService.Data.Data;
+using Maliev.InvoiceService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

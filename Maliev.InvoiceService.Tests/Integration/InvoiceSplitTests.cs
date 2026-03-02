@@ -1,4 +1,4 @@
-using Maliev.InvoiceService.Api.Models.Invoices;
+using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using System.Net;
 using System.Net.Http.Json;

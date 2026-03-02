@@ -1,8 +1,10 @@
-using Maliev.InvoiceService.Api.Models.Invoices;
-using Maliev.InvoiceService.Api.Services;
-using Maliev.InvoiceService.Api.Services.External;
-using Maliev.InvoiceService.Data.Data;
-using Maliev.InvoiceService.Data.Models;
+using Maliev.InvoiceService.Application.Models.Invoices;
+using Maliev.InvoiceService.Application.Services;
+using Maliev.InvoiceService.Application.Services.External;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Infrastructure.Services;
+using Maliev.InvoiceService.Domain.Entities;
+using Maliev.InvoiceService.Application.Models;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -19,7 +21,7 @@ namespace Maliev.InvoiceService.Tests.Unit.Services;
 /// </summary>
 public class InvoiceServiceTests : IAsyncLifetime
 {
-    private readonly Mock<ILogger<Api.Services.InvoiceService>> _loggerMock;
+    private readonly Mock<ILogger<Maliev.InvoiceService.Infrastructure.Services.InvoiceService>> _loggerMock;
     private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<ICurrencyServiceClient> _currencyClientMock;
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
@@ -30,7 +32,7 @@ public class InvoiceServiceTests : IAsyncLifetime
 
     public InvoiceServiceTests()
     {
-        _loggerMock = new Mock<ILogger<Api.Services.InvoiceService>>();
+        _loggerMock = new Mock<ILogger<Maliev.InvoiceService.Infrastructure.Services.InvoiceService>>();
         _cacheMock = new Mock<IDistributedCache>();
         _currencyClientMock = new Mock<ICurrencyServiceClient>();
         _quotationClientMock = new Mock<IQuotationServiceClient>();
@@ -245,7 +247,7 @@ public class InvoiceServiceTests : IAsyncLifetime
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -304,7 +306,7 @@ public class InvoiceServiceTests : IAsyncLifetime
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -361,7 +363,7 @@ public class InvoiceServiceTests : IAsyncLifetime
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -419,7 +421,7 @@ public class InvoiceServiceTests : IAsyncLifetime
 
         _customerClientMock
             .Setup(x => x.GetCustomerByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Maliev.InvoiceService.Api.Models.Customers.CustomerResponse
+            .ReturnsAsync(new Maliev.InvoiceService.Application.Models.Customers.CustomerResponse
             {
                 Id = Guid.NewGuid(),
                 FirstName = "Test",
@@ -428,7 +430,7 @@ public class InvoiceServiceTests : IAsyncLifetime
                 CompanyName = "Test Company"
             });
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -484,7 +486,7 @@ public class InvoiceServiceTests : IAsyncLifetime
 
         _customerClientMock
             .Setup(x => x.GetCustomerByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Maliev.InvoiceService.Api.Models.Customers.CustomerResponse
+            .ReturnsAsync(new Maliev.InvoiceService.Application.Models.Customers.CustomerResponse
             {
                 Id = Guid.NewGuid(),
                 FirstName = "Test",
@@ -493,7 +495,7 @@ public class InvoiceServiceTests : IAsyncLifetime
                 CompanyName = "Test Company"
             });
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
