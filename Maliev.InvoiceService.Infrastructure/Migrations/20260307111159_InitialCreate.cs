@@ -13,6 +13,9 @@ namespace Maliev.InvoiceService.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateSequence<int>(
+                name: "invoice_number_seq");
+
             migrationBuilder.CreateTable(
                 name: "billing_notes",
                 columns: table => new
