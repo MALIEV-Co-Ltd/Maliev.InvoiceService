@@ -9,8 +9,8 @@ This document provides essential instructions for AI agents operating in this re
 - **Run API**: `dotnet run --project Maliev.InvoiceService.Api`
 - **Run All Tests**: `dotnet test Maliev.InvoiceService.slnx --verbosity normal`
 - **Format Code**: `dotnet format Maliev.InvoiceService.slnx`
-- **Update Database**: `dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Api`
-- **Add Migration**: `dotnet ef migrations add <Name> --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Api`
+- **Update Database**: `dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure`
+- **Add Migration**: `dotnet ef migrations add <Name> --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure`
 
 ### Running Tests
 - **Single Test**: `dotnet test --filter "Fully.Qualified.Namespace.ClassName.TestMethodName"`
@@ -110,9 +110,9 @@ This document provides essential instructions for AI agents operating in this re
 ### EF Core Design Package
 - ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
 - ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
-- Migration commands must target Infrastructure, not Api:
+- Migration commands must target Infrastructure as both project and startup-project (since EF Core Design package is in Infrastructure):
   ```
-  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project ../Maliev.<Domain>Service.Api
+  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project Maliev.<Domain>Service.Infrastructure
   ```
 
 ### PostgreSQL xmin Concurrency — Mandatory Pattern
