@@ -30,7 +30,6 @@ public class InvoiceUpdateDeleteTests : BaseIntegrationTest
             DueDate = DateTime.UtcNow.Date.AddDays(45),
             PaymentTermsDays = 45,
             LateFeePercentage = 1.5m,
-            RowVersion = await GetInvoiceRowVersionAsync(invoiceId),
             Lines = new List<InvoiceLineItemRequest>
             {
                 new() { LineNumber = 1, Description = "Updated Product", Quantity = 5, UnitPrice = 200, TaxRate = 7 }
@@ -65,7 +64,6 @@ public class InvoiceUpdateDeleteTests : BaseIntegrationTest
             CustomerName = "Updated Customer",
             CustomerTaxId = "9876543210987",
             BillingAddress = "456 New St",
-            RowVersion = await GetInvoiceRowVersionAsync(invoiceId),
             Lines = new List<InvoiceLineItemRequest>
             {
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
@@ -152,12 +150,6 @@ public class InvoiceUpdateDeleteTests : BaseIntegrationTest
         return invoice.Id;
     }
 
-    private async Task<byte[]> GetInvoiceRowVersionAsync(Guid invoiceId)
-    {
-        var response = await Client.GetAsync($"/invoice/v1/invoices/{invoiceId}");
-        var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
-        return invoice!.RowVersion;
-    }
 }
 
 public class InvoiceExportTests : BaseIntegrationTest

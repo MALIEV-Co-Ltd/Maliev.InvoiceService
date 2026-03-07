@@ -166,10 +166,10 @@ Ensure PostgreSQL is running and environment variable is set:
 dotnet build Maliev.InvoiceService.sln
 
 # Apply migrations (creates tables, indexes, sequences)
-dotnet ef database update --project Maliev.InvoiceService.Data --startup-project Maliev.InvoiceService.Api
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 
 # Verify migration
-dotnet ef migrations list --project Maliev.InvoiceService.Data --startup-project Maliev.InvoiceService.Api
+dotnet ef migrations list --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 ```
 
 Expected output:
@@ -426,7 +426,7 @@ curl http://localhost:5000/invoices/v1/audit/invoices/abc-123-def \
 docker exec -it invoice-postgres-dev psql -U postgres -c "CREATE DATABASE invoice_dev_db;"
 
 # Retry migration
-dotnet ef database update --project Maliev.InvoiceService.Data
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 ```
 
 ### Issue: "Tests fail with 'Table does not exist'"
@@ -488,17 +488,17 @@ git rebase origin/develop
 
 ```bash
 # Create new migration
-dotnet ef migrations add MigrationName --project Maliev.InvoiceService.Data
+dotnet ef migrations add MigrationName --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 
 # Review generated migration file
 # Edit migration if needed (e.g., add indexes, triggers)
 
 # Apply migration locally
-dotnet ef database update --project Maliev.InvoiceService.Data
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 
 # Test migration rollback
-dotnet ef database update PreviousMigration --project Maliev.InvoiceService.Data
-dotnet ef database update --project Maliev.InvoiceService.Data
+dotnet ef database update PreviousMigration --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 ```
 
 ### 4. Debugging

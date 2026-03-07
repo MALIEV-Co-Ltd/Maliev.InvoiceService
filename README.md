@@ -81,7 +81,7 @@ $env:ConnectionStrings__Cache="YOUR_REDIS_CONNECTION_STRING"
 
 4. **Apply Migrations & Run**
 ```bash
-dotnet ef database update --project Maliev.InvoiceService.Data
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 dotnet run --project Maliev.InvoiceService.Api
 ```
 

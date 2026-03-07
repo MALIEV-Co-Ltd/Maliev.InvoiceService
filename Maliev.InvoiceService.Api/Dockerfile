@@ -13,7 +13,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj", "Maliev.InvoiceService.Api/"]
-COPY ["Maliev.InvoiceService.Data/Maliev.InvoiceService.Data.csproj", "Maliev.InvoiceService.Data/"]
+COPY ["Maliev.InvoiceService.Application/Maliev.InvoiceService.Application.csproj", "Maliev.InvoiceService.Application/"]
+COPY ["Maliev.InvoiceService.Domain/Maliev.InvoiceService.Domain.csproj", "Maliev.InvoiceService.Domain/"]
+COPY ["Maliev.InvoiceService.Infrastructure/Maliev.InvoiceService.Infrastructure.csproj", "Maliev.InvoiceService.Infrastructure/"]
 COPY ["nuget.config", "."]
 RUN --mount=type=secret,id=nuget_username \
   --mount=type=secret,id=nuget_password \

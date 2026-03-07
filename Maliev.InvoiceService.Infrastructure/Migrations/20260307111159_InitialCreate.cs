@@ -1,8 +1,11 @@
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
+namespace Maliev.InvoiceService.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -10,6 +13,46 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "billing_notes",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    billing_note_number = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    customer_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    customer_name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    customer_tax_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    billing_address = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: false),
+                    issue_date = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    due_date = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    payment_terms_days = table.Column<int>(type: "integer", nullable: false),
+                    total_amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false),
+                    status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    notes = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_billing_notes", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "credit_terms",
+                columns: table => new
+                {
+                    code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    days = table.Column<int>(type: "integer", nullable: false),
+                    is_active = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_credit_terms", x => x.code);
+                });
+
             migrationBuilder.CreateTable(
                 name: "idempotency_keys",
                 columns: table => new
@@ -25,54 +68,6 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_idempotency_keys", x => new { x.key, x.operation });
-                });
-
-            migrationBuilder.CreateTable(
-                name: "invoices",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    invoice_number = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    parent_invoice_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    customer_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    customer_name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    customer_tax_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    billing_address = table.Column<string>(type: "text", nullable: false),
-                    shipping_address = table.Column<string>(type: "text", nullable: true),
-                    quotation_reference = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    po_number = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false, defaultValue: "Draft"),
-                    currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false, defaultValue: "THB"),
-                    exchange_rate = table.Column<decimal>(type: "numeric(18,6)", nullable: true),
-                    exchange_rate_source = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    subtotal = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
-                    tax_amount = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
-                    withholding_tax_amount = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
-                    grand_total = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
-                    issue_date = table.Column<DateTime>(type: "date", nullable: false),
-                    due_date = table.Column<DateTime>(type: "date", nullable: false),
-                    payment_terms_days = table.Column<int>(type: "integer", nullable: false, defaultValue: 30),
-                    late_fee_percentage = table.Column<decimal>(type: "numeric(5,2)", nullable: true),
-                    finalized_at = table.Column<DateTime>(type: "timestamptz", nullable: true),
-                    finalized_by = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    cancelled_at = table.Column<DateTime>(type: "timestamptz", nullable: true),
-                    cancelled_by = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
-                    cancellation_reason = table.Column<string>(type: "text", nullable: true),
-                    pdf_file_reference = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
-                    row_version = table.Column<byte[]>(type: "bytea", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()"),
-                    updated_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_invoices", x => x.id);
-                    table.ForeignKey(
-                        name: "fk_invoices_invoices_parent_invoice_id",
-                        column: x => x.parent_invoice_id,
-                        principalTable: "invoices",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -94,6 +89,62 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "invoices",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    invoice_number = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    document_type = table.Column<int>(type: "integer", nullable: false),
+                    parent_invoice_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    customer_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    customer_name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    customer_tax_id = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    billing_address = table.Column<string>(type: "text", nullable: false),
+                    shipping_address = table.Column<string>(type: "text", nullable: true),
+                    quotation_reference = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    po_number = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false, defaultValue: "Draft"),
+                    currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false, defaultValue: "THB"),
+                    exchange_rate = table.Column<decimal>(type: "numeric(18,6)", nullable: true),
+                    exchange_rate_source = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    subtotal = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
+                    tax_amount = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
+                    withholding_tax_amount = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
+                    grand_total = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
+                    issue_date = table.Column<DateTime>(type: "date", nullable: false),
+                    due_date = table.Column<DateTime>(type: "date", nullable: false),
+                    payment_terms_days = table.Column<int>(type: "integer", nullable: false, defaultValue: 30),
+                    credit_term_code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    late_fee_percentage = table.Column<decimal>(type: "numeric(5,2)", nullable: true),
+                    finalized_at = table.Column<DateTime>(type: "timestamptz", nullable: true),
+                    finalized_by = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    cancelled_at = table.Column<DateTime>(type: "timestamptz", nullable: true),
+                    cancelled_by = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    cancellation_reason = table.Column<string>(type: "text", nullable: true),
+                    pdf_file_reference = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    is_deleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    created_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()"),
+                    updated_at = table.Column<DateTime>(type: "timestamptz", nullable: false, defaultValueSql: "NOW()"),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_invoices", x => x.id);
+                    table.ForeignKey(
+                        name: "fk_invoices_credit_terms_credit_term_code",
+                        column: x => x.credit_term_code,
+                        principalTable: "credit_terms",
+                        principalColumn: "code",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "fk_invoices_invoices_parent_invoice_id",
+                        column: x => x.parent_invoice_id,
+                        principalTable: "invoices",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "audit_logs",
                 columns: table => new
                 {
@@ -112,6 +163,31 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                     table.PrimaryKey("pk_audit_logs", x => x.id);
                     table.ForeignKey(
                         name: "fk_audit_logs_invoices_invoice_id",
+                        column: x => x.invoice_id,
+                        principalTable: "invoices",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "billing_note_invoices",
+                columns: table => new
+                {
+                    billing_note_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    invoice_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    included_amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_billing_note_invoices", x => new { x.billing_note_id, x.invoice_id });
+                    table.ForeignKey(
+                        name: "fk_billing_note_invoices_billing_notes_billing_note_id",
+                        column: x => x.billing_note_id,
+                        principalTable: "billing_notes",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "fk_billing_note_invoices_invoices_invoice_id",
                         column: x => x.invoice_id,
                         principalTable: "invoices",
                         principalColumn: "id",
@@ -194,12 +270,31 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                         principalTable: "invoices",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "fk_invoice_payment_allocations_payments_payment_id",
-                        column: x => x.payment_id,
-                        principalTable: "payments",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                table: "credit_terms",
+                columns: new[] { "code", "days", "description", "is_active", "name" },
+                values: new object[,]
+                {
+                    { "2/10NET30", 30, "2% discount if paid within 10 days", true, "2% 10 Net 30" },
+                    { "CBD", 0, "Payment required before shipment", true, "Cash Before Delivery" },
+                    { "CIA", 0, "Full payment before work begins", true, "Cash in Advance" },
+                    { "COD", 0, "Payment due upon delivery", true, "Cash on Delivery" },
+                    { "DEPOSIT30", 0, "30% upfront, balance on delivery", true, "30% Deposit" },
+                    { "DEPOSIT50", 0, "50% upfront, balance on delivery", true, "50% Deposit" },
+                    { "EOM", 30, "Due end of invoice month", true, "End of Month" },
+                    { "EOM15", 45, "Due 15 days after EOM", true, "End of Month + 15" },
+                    { "EOM30", 60, "Due 30 days after EOM", true, "End of Month + 30" },
+                    { "MFI", 45, "Due end of month following invoice", true, "Month Following Invoice" },
+                    { "MILESTONE", 0, "Payment per milestone", true, "Milestone" },
+                    { "NET15", 15, "Payment due within 15 days", true, "Net 15" },
+                    { "NET30", 30, "Payment due within 30 days", true, "Net 30" },
+                    { "NET45", 45, "Payment due within 45 days", true, "Net 45" },
+                    { "NET60", 60, "Payment due within 60 days", true, "Net 60" },
+                    { "NET7", 7, "Payment due within 7 days", true, "Net 7" },
+                    { "NET90", 90, "Payment due within 90 days", true, "Net 90" },
+                    { "PREPAID", 0, "Full payment before invoice", true, "Prepaid" }
                 });
 
             migrationBuilder.CreateIndex(
@@ -222,7 +317,18 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                 name: "idx_audit_logs_timestamp",
                 table: "audit_logs",
                 column: "timestamp",
-                descending: new[] { true });
+                descending: new bool[0]);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_billing_note_invoices_invoice_id",
+                table: "billing_note_invoices",
+                column: "invoice_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_billing_notes_billing_note_number",
+                table: "billing_notes",
+                column: "billing_note_number",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "idx_file_references_invoice_id",
@@ -293,7 +399,7 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                 name: "idx_invoices_issue_date",
                 table: "invoices",
                 column: "issue_date",
-                descending: new[] { true });
+                descending: new bool[0]);
 
             migrationBuilder.CreateIndex(
                 name: "idx_invoices_parent_id",
@@ -319,70 +425,31 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                 column: "status");
 
             migrationBuilder.CreateIndex(
+                name: "ix_invoices_credit_term_code",
+                table: "invoices",
+                column: "credit_term_code");
+
+            migrationBuilder.CreateIndex(
                 name: "idx_payments_payment_date",
                 table: "payments",
                 column: "payment_date",
-                descending: new[] { true });
+                descending: new bool[0]);
 
             migrationBuilder.CreateIndex(
                 name: "idx_payments_reference_number",
                 table: "payments",
                 column: "reference_number",
                 filter: "reference_number IS NOT NULL");
-
-            // Create invoice_number_seq sequence for sequential invoice numbering
-            migrationBuilder.Sql(@"
-                CREATE SEQUENCE invoice_number_seq
-                    START WITH 1
-                    INCREMENT BY 1
-                    NO CYCLE
-                    OWNED BY NONE;
-            ");
-
-            // Create trigger function for updating updated_at timestamp
-            migrationBuilder.Sql(@"
-                CREATE OR REPLACE FUNCTION update_updated_at_column()
-                RETURNS TRIGGER AS $$
-                BEGIN
-                    NEW.updated_at = NOW();
-                    RETURN NEW;
-                END;
-                $$ LANGUAGE plpgsql;
-            ");
-
-            // Apply updated_at trigger to invoices table
-            migrationBuilder.Sql(@"
-                CREATE TRIGGER trigger_invoices_updated_at
-                BEFORE UPDATE ON invoices
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column();
-            ");
-
-            // Apply updated_at trigger to invoice_lines table
-            migrationBuilder.Sql(@"
-                CREATE TRIGGER trigger_invoice_lines_updated_at
-                BEFORE UPDATE ON invoice_lines
-                FOR EACH ROW
-                EXECUTE FUNCTION update_updated_at_column();
-            ");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // Drop triggers first
-            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_invoice_lines_updated_at ON invoice_lines;");
-            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trigger_invoices_updated_at ON invoices;");
-
-            // Drop functions
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS update_updated_at_column();");
-
-            // Drop sequence
-            migrationBuilder.Sql("DROP SEQUENCE IF EXISTS invoice_number_seq;");
-
-            // Drop tables
             migrationBuilder.DropTable(
                 name: "audit_logs");
+
+            migrationBuilder.DropTable(
+                name: "billing_note_invoices");
 
             migrationBuilder.DropTable(
                 name: "file_references");
@@ -400,7 +467,13 @@ namespace Maliev.InvoiceService.Infrastructure.Persistence.Migrations
                 name: "payments");
 
             migrationBuilder.DropTable(
+                name: "billing_notes");
+
+            migrationBuilder.DropTable(
                 name: "invoices");
+
+            migrationBuilder.DropTable(
+                name: "credit_terms");
         }
     }
 }

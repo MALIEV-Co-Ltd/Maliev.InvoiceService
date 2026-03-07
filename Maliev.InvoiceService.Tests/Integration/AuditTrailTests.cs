@@ -109,10 +109,9 @@ public class AuditTrailTests : BaseIntegrationTest
             Lines = new List<InvoiceLineItemRequest>
             {
                 new() { LineNumber = 1, Description = "Updated Product", Quantity = 2, UnitPrice = 1000, TaxRate = 7 }
-            },
-            RowVersion = invoice!.RowVersion
+            }
         };
-        var updateResponse = await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}", updateRequest);
+        var updateResponse = await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}", updateRequest);
         updateResponse.EnsureSuccessStatusCode();
 
         // Assert - Check audit trail

@@ -168,11 +168,6 @@ public class Invoice
     public bool IsDeleted { get; set; }
 
     /// <summary>
-    /// Optimistic concurrency token (must be manually incremented for PostgreSQL)
-    /// </summary>
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
-
-    /// <summary>
     /// Record creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; }

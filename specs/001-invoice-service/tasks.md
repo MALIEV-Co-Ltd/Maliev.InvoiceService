@@ -70,7 +70,7 @@ Based on MALIEV Co. Ltd. standard three-project microservice structure:
 
 ### Initial Migration
 
-- [X] T028 Create initial migration: dotnet ef migrations add InitialCreate --project Maliev.InvoiceService.Data
+- [X] T028 Create initial migration: dotnet ef migrations add InitialCreate --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 - [X] T029 Add invoice_number_seq sequence creation to migration Up() method
 - [X] T029a [P] Create SQL script files in Maliev.InvoiceService.Data/Migrations/Scripts/ for reusable trigger DDL (update_updated_at_column.sql, prevent_finalized_deletion.sql) - can run in parallel with T028-T029
 - [X] T030 Add database trigger update_updated_at_column() to migration Up() method per data-model.md lines 383-403 (references T029a SQL scripts)

@@ -21,6 +21,11 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .HasDefaultValueSql("gen_random_uuid()")
             .IsRequired();
 
+        // PostgreSQL xmin for optimistic concurrency (shadow property - NOT mapped to entity)
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .IsRowVersion();
+
         // Invoice Number
         builder.Property(i => i.InvoiceNumber)
             .HasColumnName("invoice_number")
@@ -193,13 +198,6 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
-            .IsRequired();
-
-        // Optimistic Concurrency - CRITICAL for PostgreSQL
-        builder.Property(i => i.RowVersion)
-            .HasColumnName("row_version")
-            .IsConcurrencyToken()  // Use ConcurrencyToken instead of IsRowVersion for PostgreSQL bytea
-            .ValueGeneratedNever()  // CRITICAL: Must manually increment in SaveChangesAsync
             .IsRequired();
 
         // Timestamps

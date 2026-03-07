@@ -176,8 +176,7 @@ public class InvoiceService : IInvoiceService
             LateFeePercentage = request.LateFeePercentage,
             Status = "Draft",
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // T154: Handle exchange rate - use manual rate if provided, otherwise fetch from service
@@ -1001,9 +1000,6 @@ public class InvoiceService : IInvoiceService
             .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, cancellationToken)
             ?? throw new KeyNotFoundException($"Invoice {id} not found");
 
-        // Apply RowVersion for optimistic concurrency
-        _context.Entry(invoice).Property(i => i.RowVersion).OriginalValue = request.RowVersion;
-
         // Delete existing lines (works with both relational and InMemory providers)
         _context.InvoiceLines.RemoveRange(invoice.Lines);
 
@@ -1164,8 +1160,7 @@ public class InvoiceService : IInvoiceService
                     FinalizedAt = DateTime.UtcNow,
                     FinalizedBy = splitBy, // Use the actual user
                     CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    RowVersion = new byte[8]
+                    UpdatedAt = DateTime.UtcNow
                 };
 
                 var ratio = rule.Percentage / 100m;
@@ -1609,7 +1604,6 @@ public class InvoiceService : IInvoiceService
             CancelledBy = invoice.CancelledBy,
             CancellationReason = invoice.CancellationReason,
             PdfFileReference = invoice.PdfFileReference,
-            RowVersion = invoice.RowVersion,
             CreatedAt = invoice.CreatedAt,
             UpdatedAt = invoice.UpdatedAt,
             Lines = invoice.Lines.Select(l => new InvoiceLineResponse

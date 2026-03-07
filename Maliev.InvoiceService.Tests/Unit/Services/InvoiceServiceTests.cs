@@ -154,8 +154,8 @@ public class InvoiceServiceTests : IAsyncLifetime
         // Arrange
         await using var context = CreateDbContext();
         await using var transaction = await context.Database.BeginTransactionAsync();
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Finalized", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Finalized", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await context.SaveChangesAsync();
 
         // Act
@@ -175,8 +175,8 @@ public class InvoiceServiceTests : IAsyncLifetime
         var targetCustomerId = Guid.NewGuid();
         await using var context = CreateDbContext();
         await using var transaction = await context.Database.BeginTransactionAsync();
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = targetCustomerId, Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = targetCustomerId, Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await context.SaveChangesAsync();
 
         // Act
@@ -207,8 +207,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -241,8 +240,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
@@ -263,7 +261,6 @@ public class InvoiceServiceTests : IAsyncLifetime
             Currency = "THB",
             DueDate = DateTime.UtcNow.AddDays(30),
             Lines = new List<InvoiceLineItemRequest>(),
-            RowVersion = invoice.RowVersion,
             CustomerName = "Updated Name",
             CustomerTaxId = "1234567890123",
             BillingAddress = "123 Updated St"
@@ -300,8 +297,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
@@ -322,7 +318,6 @@ public class InvoiceServiceTests : IAsyncLifetime
             Currency = "THB",
             DueDate = DateTime.UtcNow.AddDays(30),
             Lines = new List<InvoiceLineItemRequest>(),
-            RowVersion = invoice.RowVersion,
             CustomerName = "Updated Name",
             CustomerTaxId = "1234567890123",
             BillingAddress = "123 Updated St"
@@ -357,8 +352,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             TaxAmount = 70m,
             GrandTotal = 1070m,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = BitConverter.GetBytes(1L)
+            UpdatedAt = DateTime.UtcNow
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
@@ -389,8 +383,7 @@ public class InvoiceServiceTests : IAsyncLifetime
                     Quantity = 2,
                     UnitPrice = 500m
                 }
-            },
-            RowVersion = invoice.RowVersion
+            }
         };
 
         // Act
@@ -554,8 +547,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act
@@ -579,8 +571,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act & Assert

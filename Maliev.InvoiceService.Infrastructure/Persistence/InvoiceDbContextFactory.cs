@@ -20,7 +20,6 @@ public class InvoiceDbContextFactory : IDesignTimeDbContextFactory<InvoiceDbCont
 
         optionsBuilder.UseNpgsql(connectionString, options =>
         {
-            options.MigrationsAssembly("Maliev.InvoiceService.Data");
             options.CommandTimeout(30);
         });
 

@@ -8,7 +8,6 @@ using Maliev.InvoiceService.Infrastructure.Services;
 using Maliev.InvoiceService.Infrastructure.BackgroundServices;
 using Maliev.InvoiceService.Infrastructure.HttpClients;
 using Maliev.InvoiceService.Api.Services;
-using Microsoft.EntityFrameworkCore;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());

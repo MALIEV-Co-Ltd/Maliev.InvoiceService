@@ -4,7 +4,6 @@ namespace Maliev.InvoiceService.Application.Models.Invoices;
 
 /// <summary>
 /// Request model for updating an existing draft invoice.
-/// Includes RowVersion for optimistic concurrency control.
 /// </summary>
 public class UpdateInvoiceRequest
 {
@@ -87,11 +86,4 @@ public class UpdateInvoiceRequest
     [MaxLength(50)]
     public List<InvoiceLineItemRequest> Lines { get; set; } = new();
 
-    /// <summary>
-    /// Gets or sets the row version for optimistic concurrency control.
-    /// Must match the current version in the database to prevent conflicting updates.
-    /// </summary>
-    [Required]
-    [MinLength(1)]
-    public required byte[] RowVersion { get; set; }
 }

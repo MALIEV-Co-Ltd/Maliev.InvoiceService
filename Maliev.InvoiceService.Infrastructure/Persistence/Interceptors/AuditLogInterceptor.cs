@@ -130,8 +130,7 @@ public class AuditLogInterceptor : SaveChangesInterceptor
         foreach (var property in entry.Properties)
         {
             if (property.IsModified &&
-                property.Metadata.Name != nameof(Invoice.UpdatedAt) &&
-                property.Metadata.Name != nameof(Invoice.RowVersion))
+                property.Metadata.Name != nameof(Invoice.UpdatedAt))
             {
                 var originalValue = property.OriginalValue?.ToString() ?? "NULL";
                 var currentValue = property.CurrentValue?.ToString() ?? "NULL";
