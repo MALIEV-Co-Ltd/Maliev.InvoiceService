@@ -1,9 +1,13 @@
 using Maliev.Aspire.ServiceDefaults;
+using Maliev.InvoiceService.Application.Services;
+using Maliev.InvoiceService.Application.Services.External;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Infrastructure.Persistence.Interceptors;
+using Maliev.InvoiceService.Infrastructure.Consumers;
+using Maliev.InvoiceService.Infrastructure.Services;
+using Maliev.InvoiceService.Infrastructure.BackgroundServices;
+using Maliev.InvoiceService.Infrastructure.HttpClients;
 using Maliev.InvoiceService.Api.Services;
-using Maliev.InvoiceService.Api.Services.External;
-using Maliev.InvoiceService.Data.Data;
-using Maliev.InvoiceService.Data.Data.Interceptors;
-using Microsoft.EntityFrameworkCore;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -42,10 +46,10 @@ try
     builder.AddStandardCache("invoice:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
     builder.AddMassTransitWithRabbitMq(x =>
     {
-        x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.FileDeletedEventConsumer>();
-        x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.PaymentCompletedEventConsumer>();
-        x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.OrderPaidEventConsumer>();
-        x.AddConsumer<Maliev.InvoiceService.Api.Services.Consumers.PdfGenerationCompletedEventConsumer>();
+        x.AddConsumer<FileDeletedEventConsumer>();
+        x.AddConsumer<PaymentCompletedEventConsumer>();
+        x.AddConsumer<OrderPaidEventConsumer>();
+        x.AddConsumer<PdfGenerationCompletedEventConsumer>();
     }); // RabbitMQ message bus (non-blocking startup)
 
     // --- API Configuration ---
@@ -76,11 +80,11 @@ try
     builder.Services.AddControllers();
     builder.Services.AddMemoryCache();
     // Services
-    builder.Services.AddScoped<Maliev.InvoiceService.Api.Services.IInvoiceService, Maliev.InvoiceService.Api.Services.InvoiceService>();
-    builder.Services.AddScoped<Maliev.InvoiceService.Api.Services.IBillingNoteService, Maliev.InvoiceService.Api.Services.BillingNoteService>();
+    builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+    builder.Services.AddScoped<IBillingNoteService, BillingNoteService>();
 
     // Background Services
-    builder.Services.AddHostedService<Maliev.InvoiceService.Api.Services.BackgroundServices.AuditArchivalService>();
+    builder.Services.AddHostedService<AuditArchivalService>();
 
     // External Service Clients with Polly v8 Resilience
     builder.AddServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService");

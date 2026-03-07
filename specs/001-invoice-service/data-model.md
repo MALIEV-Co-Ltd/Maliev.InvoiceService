@@ -575,10 +575,10 @@ public class InvoicePaymentConfiguration : IEntityTypeConfiguration<InvoicePayme
 export ConnectionStrings__InvoiceDbContext="Server=localhost;Port=5432;Database=invoice_dev_db;Username=postgres;Password=<dev-password>;"
 
 # Create initial migration
-dotnet ef migrations add InitialCreate --project Maliev.InvoiceService.Data --startup-project Maliev.InvoiceService.Api
+dotnet ef migrations add InitialCreate --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 
 # Apply migration to local database
-dotnet ef database update --project Maliev.InvoiceService.Data --startup-project Maliev.InvoiceService.Api
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 ```
 
 ### Kubernetes Database Migration
@@ -591,7 +591,7 @@ kubectl port-forward -n maliev-dev postgres-cluster-1 5432:5432
 export ConnectionStrings__InvoiceDbContext="Server=localhost;Port=5432;Database=invoice_app_db;Username=postgres;Password=<actual-password>;"
 
 # Apply migrations
-dotnet ef database update --project Maliev.InvoiceService.Data
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
 ```
 
 ---

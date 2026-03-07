@@ -1,8 +1,10 @@
-using Maliev.InvoiceService.Api.Models.Invoices;
-using Maliev.InvoiceService.Api.Services;
-using Maliev.InvoiceService.Api.Services.External;
-using Maliev.InvoiceService.Data.Data;
-using Maliev.InvoiceService.Data.Models;
+using Maliev.InvoiceService.Application.Models.Invoices;
+using Maliev.InvoiceService.Application.Services;
+using Maliev.InvoiceService.Application.Services.External;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Infrastructure.Services;
+using Maliev.InvoiceService.Domain.Entities;
+using Maliev.InvoiceService.Application.Models;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -19,7 +21,7 @@ namespace Maliev.InvoiceService.Tests.Unit.Services;
 /// </summary>
 public class InvoiceServiceTests : IAsyncLifetime
 {
-    private readonly Mock<ILogger<Api.Services.InvoiceService>> _loggerMock;
+    private readonly Mock<ILogger<Maliev.InvoiceService.Infrastructure.Services.InvoiceService>> _loggerMock;
     private readonly Mock<IDistributedCache> _cacheMock;
     private readonly Mock<ICurrencyServiceClient> _currencyClientMock;
     private readonly Mock<IQuotationServiceClient> _quotationClientMock;
@@ -30,7 +32,7 @@ public class InvoiceServiceTests : IAsyncLifetime
 
     public InvoiceServiceTests()
     {
-        _loggerMock = new Mock<ILogger<Api.Services.InvoiceService>>();
+        _loggerMock = new Mock<ILogger<Maliev.InvoiceService.Infrastructure.Services.InvoiceService>>();
         _cacheMock = new Mock<IDistributedCache>();
         _currencyClientMock = new Mock<ICurrencyServiceClient>();
         _quotationClientMock = new Mock<IQuotationServiceClient>();
@@ -152,8 +154,8 @@ public class InvoiceServiceTests : IAsyncLifetime
         // Arrange
         await using var context = CreateDbContext();
         await using var transaction = await context.Database.BeginTransactionAsync();
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Finalized", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Finalized", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await context.SaveChangesAsync();
 
         // Act
@@ -173,8 +175,8 @@ public class InvoiceServiceTests : IAsyncLifetime
         var targetCustomerId = Guid.NewGuid();
         await using var context = CreateDbContext();
         await using var transaction = await context.Database.BeginTransactionAsync();
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = targetCustomerId, Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
-        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow, RowVersion = new byte[8] });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = targetCustomerId, Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+        context.Invoices.Add(new Invoice { Id = Guid.NewGuid(), Status = "Draft", CustomerId = Guid.NewGuid(), Currency = "THB", IssueDate = DateTime.UtcNow, DueDate = DateTime.UtcNow.AddDays(30), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         await context.SaveChangesAsync();
 
         // Act
@@ -205,8 +207,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -239,13 +240,12 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -261,7 +261,6 @@ public class InvoiceServiceTests : IAsyncLifetime
             Currency = "THB",
             DueDate = DateTime.UtcNow.AddDays(30),
             Lines = new List<InvoiceLineItemRequest>(),
-            RowVersion = invoice.RowVersion,
             CustomerName = "Updated Name",
             CustomerTaxId = "1234567890123",
             BillingAddress = "123 Updated St"
@@ -298,13 +297,12 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -320,7 +318,6 @@ public class InvoiceServiceTests : IAsyncLifetime
             Currency = "THB",
             DueDate = DateTime.UtcNow.AddDays(30),
             Lines = new List<InvoiceLineItemRequest>(),
-            RowVersion = invoice.RowVersion,
             CustomerName = "Updated Name",
             CustomerTaxId = "1234567890123",
             BillingAddress = "123 Updated St"
@@ -355,13 +352,12 @@ public class InvoiceServiceTests : IAsyncLifetime
             TaxAmount = 70m,
             GrandTotal = 1070m,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = BitConverter.GetBytes(1L)
+            UpdatedAt = DateTime.UtcNow
         };
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -387,8 +383,7 @@ public class InvoiceServiceTests : IAsyncLifetime
                     Quantity = 2,
                     UnitPrice = 500m
                 }
-            },
-            RowVersion = invoice.RowVersion
+            }
         };
 
         // Act
@@ -419,7 +414,7 @@ public class InvoiceServiceTests : IAsyncLifetime
 
         _customerClientMock
             .Setup(x => x.GetCustomerByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Maliev.InvoiceService.Api.Models.Customers.CustomerResponse
+            .ReturnsAsync(new Maliev.InvoiceService.Application.Models.Customers.CustomerResponse
             {
                 Id = Guid.NewGuid(),
                 FirstName = "Test",
@@ -428,7 +423,7 @@ public class InvoiceServiceTests : IAsyncLifetime
                 CompanyName = "Test Company"
             });
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -484,7 +479,7 @@ public class InvoiceServiceTests : IAsyncLifetime
 
         _customerClientMock
             .Setup(x => x.GetCustomerByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Maliev.InvoiceService.Api.Models.Customers.CustomerResponse
+            .ReturnsAsync(new Maliev.InvoiceService.Application.Models.Customers.CustomerResponse
             {
                 Id = Guid.NewGuid(),
                 FirstName = "Test",
@@ -493,7 +488,7 @@ public class InvoiceServiceTests : IAsyncLifetime
                 CompanyName = "Test Company"
             });
 
-        var service = new Api.Services.InvoiceService(
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
             context,
             _loggerMock.Object,
             _cacheMock.Object,
@@ -552,8 +547,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act
@@ -577,8 +571,7 @@ public class InvoiceServiceTests : IAsyncLifetime
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(30),
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[8]
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act & Assert

@@ -1,5 +1,5 @@
-using Maliev.InvoiceService.Api.Models.Customers;
-using Maliev.InvoiceService.Api.Services.External;
+using Maliev.InvoiceService.Application.Models.Customers;
+using Maliev.InvoiceService.Application.Services.External;
 
 namespace Maliev.InvoiceService.Tests.Mocks;
 

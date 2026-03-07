@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.InvoiceService.Api.Models.Common;
-using Maliev.InvoiceService.Api.Models.Invoices;
+using Maliev.InvoiceService.Application.Models.Common;
+using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using System.Text.RegularExpressions;
 

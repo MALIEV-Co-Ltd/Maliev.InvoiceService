@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
-using Maliev.InvoiceService.Api.Models.Audit;
-using Maliev.InvoiceService.Api.Models.Invoices;
+using Maliev.InvoiceService.Application.Models.Audit;
+using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 
 namespace Maliev.InvoiceService.Tests.Integration;
@@ -109,10 +109,9 @@ public class AuditTrailTests : BaseIntegrationTest
             Lines = new List<InvoiceLineItemRequest>
             {
                 new() { LineNumber = 1, Description = "Updated Product", Quantity = 2, UnitPrice = 1000, TaxRate = 7 }
-            },
-            RowVersion = invoice!.RowVersion
+            }
         };
-        var updateResponse = await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice.Id}", updateRequest);
+        var updateResponse = await Client.PutAsJsonAsync($"/invoice/v1/invoices/{invoice!.Id}", updateRequest);
         updateResponse.EnsureSuccessStatusCode();
 
         // Assert - Check audit trail

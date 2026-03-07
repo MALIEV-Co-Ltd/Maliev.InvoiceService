@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Maliev.InvoiceService.Api.Authorization;
-using Maliev.InvoiceService.Api.Models.Invoices;
+using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Tests.Fixtures;
 using Maliev.InvoiceService.Tests.Testing;
 
