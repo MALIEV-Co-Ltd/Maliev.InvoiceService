@@ -12,7 +12,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// Controller for managing payment operations including creation, retrieval, and invoice linking.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("invoice/v{version:apiVersion}/payments")]
 public class PaymentsController : ControllerBase
 {

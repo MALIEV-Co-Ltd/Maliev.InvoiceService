@@ -11,7 +11,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// Controller for managing billing notes (Thai ใบวางบิล).
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("invoice/v{version:apiVersion}/billing-notes")]
 public class BillingNotesController : ControllerBase
 {

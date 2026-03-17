@@ -10,7 +10,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// Controller for managing invoice segments.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("invoice/v{version:apiVersion}/segments")]
 public class InvoiceSegmentsController : ControllerBase
 {

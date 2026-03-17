@@ -11,7 +11,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// Controller for retrieving audit trail information for invoices and related entities.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("invoice/v{version:apiVersion}/audit")]
 public class AuditController : ControllerBase
 {

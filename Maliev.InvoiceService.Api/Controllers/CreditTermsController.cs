@@ -12,7 +12,7 @@ namespace Maliev.InvoiceService.Api.Controllers;
 /// Controller for managing credit terms reference data.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("invoice/v{version:apiVersion}/credit-terms")]
 public class CreditTermsController : ControllerBase
 {
