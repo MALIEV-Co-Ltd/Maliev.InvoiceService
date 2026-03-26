@@ -9,10 +9,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Maliev.InvoiceService.Infrastructure.Migrations
+namespace Maliev.InvoiceService.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(InvoiceDbContext))]
-    [Migration("20260307111159_InitialCreate")]
+    [Migration("20260325114544_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,10 +20,12 @@ namespace Maliev.InvoiceService.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.HasSequence<int>("invoice_number_seq");
 
             modelBuilder.Entity("Maliev.InvoiceService.Domain.Entities.AuditLog", b =>
                 {

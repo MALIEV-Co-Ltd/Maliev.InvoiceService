@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace Maliev.InvoiceService.Infrastructure.Migrations
+namespace Maliev.InvoiceService.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -477,6 +477,9 @@ namespace Maliev.InvoiceService.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "credit_terms");
+
+            migrationBuilder.DropSequence(
+                name: "invoice_number_seq");
         }
     }
 }
