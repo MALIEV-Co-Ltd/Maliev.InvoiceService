@@ -53,10 +53,11 @@ public class InvoicesController : ControllerBase
         _logger.LogInformation("[{CorrelationId}] Creating invoice for customer {CustomerId}", CorrelationId, request.CustomerId);
 
         var invoice = await _invoiceService.CreateInvoiceAsync(request, cancellationToken);
+        var apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
 
         _logger.LogInformation("[{CorrelationId}] Created invoice {InvoiceId}", CorrelationId, invoice.Id);
 
-        return CreatedAtAction(nameof(GetInvoice), new { id = invoice.Id, version = "1" }, invoice);
+        return CreatedAtAction(nameof(GetInvoice), new { id = invoice.Id, version = apiVersion }, invoice);
     }
 
     /// <summary>
@@ -378,7 +379,8 @@ public class InvoicesController : ControllerBase
         try
         {
             var fileReference = await _invoiceService.RegisterFileAsync(id, request, cancellationToken);
-            return CreatedAtAction(nameof(GetFiles), new { id, version = "1" }, fileReference);
+            var apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
+            return CreatedAtAction(nameof(GetFiles), new { id, version = apiVersion }, fileReference);
         }
         catch (KeyNotFoundException)
         {
