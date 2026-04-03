@@ -2,57 +2,90 @@
 
 This document provides essential instructions for AI agents operating in this repository.
 
-## 🛠 Build and Development
+## Build, Test & Lint Commands
 
-### Core Commands
-- **Build Solution**: `dotnet build Maliev.InvoiceService.slnx`
-- **Run API**: `dotnet run --project Maliev.InvoiceService.Api`
-- **Run All Tests**: `dotnet test Maliev.InvoiceService.slnx --verbosity normal`
-- **Format Code**: `dotnet format Maliev.InvoiceService.slnx`
-- **Update Database**: `dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure`
-- **Add Migration**: `dotnet ef migrations add <Name> --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure`
+All commands run from within this service directory (`B:\maliev\Maliev.InvoiceService`).
 
-### Running Tests
-- **Single Test**: `dotnet test --filter "Fully.Qualified.Namespace.ClassName.TestMethodName"`
-- **Tests in Class**: `dotnet test --filter "ClassName"`
-- **Integration Tests**: Require Docker/Testcontainers. Ensure Docker is running.
-- **Test Results**: Coverage reports are stored in `coverage/`.
+```powershell
+# Build (treats warnings as errors — all must be fixed)
+dotnet build Maliev.InvoiceService.slnx
 
----
+# Run all tests
+dotnet test Maliev.InvoiceService.slnx --verbosity normal
 
-## 📏 Code Style and Conventions
+# Run a single test method
+dotnet test --filter "FullyQualifiedName~ClassName.MethodName_StateUnderTest_ExpectedBehavior"
 
-### Architecture & Libraries
-- **No AutoMapper**: Perform explicit manual mapping between Entities and DTOs.
-- **No FluentValidation**: Use standard `System.ComponentModel.DataAnnotations` (e.g., `[Required]`, `[StringLength]`).
-- **No FluentAssertions**: Use standard xUnit `Assert` methods (e.g., `Assert.Equal()`).
-- **Entity Framework**: Use EF Core 10.x. All integration tests MUST use `Testcontainers` with PostgreSQL 18.
+# Run all tests in a class
+dotnet test --filter "FullyQualifiedName~ClassName"
 
-### C# Language Guidelines
-- **Language Version**: C# 13 (.NET 10.0).
-- **Namespaces**: Use file-scoped namespaces: `namespace Maliev.InvoiceService.Api.Services;`.
-- **Async/Await**: All asynchronous methods must have the `Async` suffix and accept a `CancellationToken`. Always use `ConfigureAwait(false)` in library/data projects, though less critical in ASP.NET Core 10.
-- **Documentation**: XML documentation is MANDATORY for all public classes, methods, and properties.
-  - Example: `/// <summary>Brief description</summary>`
-- **Warnings**: `TreatWarningsAsErrors` is enabled. Code must compile without warnings.
+# Run with code coverage
+dotnet test Maliev.InvoiceService.slnx --collect:"XPlat Code Coverage"
 
-### Naming Conventions
-- **Classes/Interfaces**: `PascalCase`. Interfaces prefixed with `I` (e.g., `IInvoiceService`).
-- **Methods**: `PascalCase`.
-- **Properties**: `PascalCase`.
-- **Private Fields**: `_camelCase` with underscore prefix (e.g., `_invoiceContext`).
-- **Local Variables**: `camelCase`. Use `var` when the type is obvious from the right-hand side (e.g., `var list = new List<string>();`).
-- **Constants**: `PascalCase` or `UPPER_SNAKE_CASE` depending on context (prefer `PascalCase` for public constants).
+# Format check
+dotnet format Maliev.InvoiceService.slnx
 
-### Formatting
-- **Indentation**: 4 spaces.
-- **Braces**: Allman style (braces on new lines).
-- **Line Length**: Aim for < 120 characters where possible.
-- **Imports**: Organize using statements: System first, then Microsoft, then Third-party, then Internal.
+# EF Core migrations (Infrastructure/Data project only)
+dotnet ef migrations add <Name> --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
+```
 
 ---
 
-## 🛡 Error Handling & Reliability
+## Code Style & Conventions
+
+### Workspace Structure
+```
+Maliev.InvoiceService/
+├── Maliev.InvoiceService.Api/           # Controllers, Consumers, Middleware
+├── Maliev.InvoiceService.Application/   # Use cases, DTOs, Interfaces, Handlers
+├── Maliev.InvoiceService.Domain/        # Entities, value objects, domain interfaces
+├── Maliev.InvoiceService.Infrastructure/ # EF Core DbContext, repositories, HTTP clients
+├── Maliev.InvoiceService.Tests/         # Unit + Integration tests (xUnit)
+├── specs/                               # API specifications and business rules
+├── Directory.Build.props                # Central package versioning
+└── Maliev.InvoiceService.slnx          # Solution file (.slnx preferred over .sln)
+```
+
+### C# Naming & Formatting
+- **Namespaces**: File-scoped (`namespace Maliev.InvoiceService.Api.Services;`)
+- **Classes/Methods/Properties**: `PascalCase`
+- **Private fields**: `_camelCase` (underscore prefix)
+- **Parameters/locals**: `camelCase`
+- **Async methods**: Suffix with `Async` (e.g., `FinalizeInvoiceAsync`)
+- **Interfaces**: Prefix with `I` (e.g., `IInvoiceService`)
+- **Permissions**: GCP-style `{domain}.{plural-resource}.{action}` as `public const string` in a `Permissions` static class
+  - Valid: `invoice.invoices.create`, `invoice.invoices.finalize`
+  - Invalid: `invoice.invoice.create` (singular), `invoice.finalize` (missing resource)
+- **XML docs**: Required on ALL public methods and properties
+- **Nullable**: Enabled (`<Nullable>enable</Nullable>`). Use `?` explicitly
+- **Imports**: System first, then third-party, then local. Alphabetize within groups. Remove unused `using`
+- **Braces**: Allman style (new line) for methods and control structures. Expression-bodied for properties/accessors
+- **Indentation**: 4 spaces, LF line endings, UTF-8, trim trailing whitespace
+
+### C# Patterns
+- **DI**: Constructor injection with `private readonly` fields
+- **Controllers**: `[ApiController]`, `[ApiVersion("1")]`, `[Route("invoice/v{version:apiVersion}")]`
+- **Logging**: `ILogger<T>` with structured placeholders (never interpolate): `_logger.LogInformation("Processing {InvoiceId}", invoiceId)`
+- **Error handling**: Global exception middleware. Return `ProblemDetails` / `ErrorResponse` DTOs. Never expose stack traces
+- **JSON**: Check existing conventions in this service for naming policy
+- **Manual mapping**: Static extension methods (`ToDto()`, `ToEntity()`). AutoMapper is banned
+- **Validation**: `System.ComponentModel.DataAnnotations` on DTOs. FluentValidation is banned
+
+---
+
+## Banned Libraries (Build Will Fail)
+
+| Banned | Use Instead |
+|--------|-------------|
+| AutoMapper | Manual mapping extensions |
+| FluentValidation | DataAnnotations or manual validation |
+| FluentAssertions | Standard xUnit `Assert.*` |
+| Swashbuckle/Swagger | Scalar (at `/invoice/scalar`) |
+| InMemoryDatabase (EF Core) | Testcontainers with real PostgreSQL |
+
+---
+
+## Error Handling & Reliability
 
 ### Exception Strategy
 - Use specific exceptions: `KeyNotFoundException` (404), `InvalidOperationException` (400/409), `ArgumentException` (400).
@@ -74,28 +107,15 @@ This document provides essential instructions for AI agents operating in this re
 
 ---
 
-## 🏗 Project Structure
+## Testing Rules
 
-- `Maliev.InvoiceService.Api`: ASP.NET Core API controllers, DTOs, and business services.
-- `Maliev.InvoiceService.Data`: EF Core DbContext, Migrations, and Database Models.
-- `Maliev.InvoiceService.Tests`: Unit, Integration, and Contract tests.
-- `specs/`: Contains API specifications and business rules.
-
----
-
-## 🔒 Security & Secrets
-- **No Secrets**: Never commit API keys, connection strings, or credentials. Use `UserSecrets` for local dev.
-- **Environment Variables**: Use `IConfiguration` with environment variable overrides in production.
-- **Permissions**: Use `[RequirePermission(InvoicePermissions.Name)]` on controller actions. Permissions follow the pattern `service.resource.action`.
-
-
----
-
-## 🧪 Testing Guidelines
-- **Unit Tests**: Mock external dependencies using `Moq`.
-- **Integration Tests**: Use `BaseIntegrationTest` which handles the Testcontainers lifecycle.
-- **Data Integrity**: Verify `RowVersion` for optimistic concurrency in updates.
-- **Rounding**: Reconcile rounding errors in financial calculations (e.g., invoice splitting).
+- **Framework**: xUnit with standard `Assert` (`Assert.Equal`, `Assert.NotNull`, etc.)
+- **Naming**: `MethodName_StateUnderTest_ExpectedBehavior` or `HTTP_METHOD_Path_Scenario_ExpectedStatus`
+- **Coverage**: Minimum 80% per service
+- **Integration tests**: `BaseIntegrationTestFactory<TProgram, TDbContext>` with Testcontainers (PostgreSQL, Redis, RabbitMQ). Never InMemoryDatabase
+- **System tests** (Tier 3): `AspireTestFixture` with `[Collection("AspireDomainTests")]` — shared AppHost, never one per class
+- **Eventual consistency**: Use `TestHelpers.WaitForAsync`. Never `Task.Delay`
+- **MassTransit consumers**: Must have consumer tests using `AddMassTransitTestHarness()`
 
 ### Testing Strategy (4-Tier Pyramid Context)
 
@@ -119,34 +139,52 @@ This service's tests cover **Tier 1 (Unit)** and **Tier 2 (Service Integration)*
 
 ---
 
-## 🚀 Deployment & CI/CD
+## Mandatory Rules
+
+- **`TreatWarningsAsErrors = true`**: Zero warnings allowed. No suppression
+- **`[RequirePermission("domain.resources.action")]`**: On all endpoints, not plain `[Authorize]`
+- **API versioning**: All routes versioned (`v1/`)
+- **Service prefix**: Routes prefixed with service domain (e.g., `/invoice`)
+- **Scalar docs**: Configured at `/invoice/scalar`
+- **Secrets**: Never hardcoded. Use GCP Secret Manager or environment variables
+- **Async/await**: All the way down. Pass `CancellationToken`
+- **EF Core Design package**: Only in Infrastructure project, never in Api
+- **PostgreSQL xmin**: Shadow property only — `entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion()`. Never add entity property
+- **Temporary files**: Generate in `/temp` folder, clean up afterwards
+
+---
+
+## Security & Secrets
+- **No Secrets**: Never commit API keys, connection strings, or credentials. Use `UserSecrets` for local dev.
+- **Environment Variables**: Use `IConfiguration` with environment variable overrides in production.
+- **Permissions**: Use `[RequirePermission(InvoicePermissions.Name)]` on controller actions. Permissions follow the pattern `invoice.invoices.action`.
+
+---
+
+## Deployment & CI/CD
 - **Pre-commit Hooks**: Run `dotnet format` and `verify build` before every commit.
 - **Health Checks**: API must expose `/liveness` and `/readiness` endpoints.
 - **Metrics**: Use `OpenTelemetry` for custom metrics (see `InvoiceMetrics.cs`).
 
+---
 
-## Git & Version Control — Mandatory Rules
+## Git Rules
 
-### 🚨 CRITICAL: Always Commit Code Changes (Non-Negotiable)
-- **You MUST commit your changes to the local repository after completing any meaningful unit of work.**
-- **Never accumulate uncommitted changes.** Do not wait until end of session or until something breaks.
-- **Commit early and often** — if a change is meaningful (even a small fix or refactor), commit it.
-- **You do NOT need to push to remote** — local commits are sufficient to protect against accidental loss.
-- **If you are unsure whether to commit, commit anyway.** Extra commits are harmless; lost work is irreversible.
-- This rule applies even if you are just "testing" or "exploring" — use git branches to isolate experimental work and commit those changes too.
+- Each `Maliev.*` folder is an independent git repo. `cd` into it before git commands
+- **Commit early and often** after every meaningful unit of work. Do not accumulate changes
+- **Never use `git checkout` to restore files** — commit first, then `git revert` or `git reset --soft`
+- Feature branches merged to `develop` via PR. Do not push without being asked
 
-### 🚨 CRITICAL: Never Use `git checkout` to Restore Broken Files
-- **NEVER use `git checkout` to restore or recover files.** This operation discards uncommitted changes permanently and will result in data loss.
-- **To undo/recover from broken files: first commit your current changes, then use `git revert` or `git reset --soft` to safely undo.**
+---
 
 ## Database & EF Core — Mandatory Rules
 
 ### EF Core Design Package
-- ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
-- ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
-- Migration commands must target Infrastructure as both project and startup-project (since EF Core Design package is in Infrastructure):
+- `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
+- It belongs ONLY in the Infrastructure (or Data) project where migrations live
+- Migration commands must target Infrastructure as both project and startup-project:
   ```
-  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project Maliev.<Domain>Service.Infrastructure
+  dotnet ef migrations add <Name> --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
   ```
 
 ### PostgreSQL xmin Concurrency — Mandatory Pattern
@@ -154,6 +192,6 @@ Use shadow property ONLY. Never add a Xmin/xmin property to domain entities.
 ```csharp
 entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
 ```
-- ❌ Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
-- ❌ Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
-- ❌ Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
+- Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
+- Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
+- Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
