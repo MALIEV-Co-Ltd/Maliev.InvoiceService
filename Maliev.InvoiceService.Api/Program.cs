@@ -50,6 +50,7 @@ try
         x.AddConsumer<PaymentCompletedEventConsumer>();
         x.AddConsumer<OrderPaidEventConsumer>();
         x.AddConsumer<PdfGenerationCompletedEventConsumer>();
+        x.AddConsumer<SearchReindexRequestedConsumer>();
     }); // RabbitMQ message bus (non-blocking startup)
 
     // --- API Configuration ---

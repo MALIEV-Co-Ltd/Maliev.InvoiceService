@@ -12,6 +12,7 @@ using Maliev.MessagingContracts.Contracts.Invoices;
 using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.MessagingContracts.Contracts.Pdf;
+using Maliev.MessagingContracts.Contracts.Search;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -99,6 +100,16 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.NotNull(@event.Payload.InvoiceNumber);
             Assert.Equal("THB", @event.Payload.Currency);
             Assert.Equal(customerId, @event.Payload.CustomerId);
+
+            Assert.True(await harness.Published.Any<SearchDocumentUpsertedEvent>(),
+                "SearchDocumentUpsertedEvent should be published");
+
+            var searchMessage = harness.Published.Select<SearchDocumentUpsertedEvent>()
+                .FirstOrDefault(x => x.Context.Message.Payload.ResourceId == invoice.Id.ToString());
+            Assert.NotNull(searchMessage);
+            Assert.Equal("InvoiceService", searchMessage.Context.Message.Payload.SourceService);
+            Assert.Equal("invoice", searchMessage.Context.Message.Payload.ResourceType);
+            Assert.Equal("invoice.invoices.read", searchMessage.Context.Message.Payload.RequiredPermission);
         }
         finally
         {

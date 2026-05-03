@@ -5,6 +5,7 @@ using Maliev.InvoiceService.Infrastructure.Persistence;
 using Maliev.InvoiceService.Infrastructure.Services;
 using Maliev.InvoiceService.Domain.Entities;
 using Maliev.InvoiceService.Application.Models;
+using Maliev.MessagingContracts.Contracts.Search;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -28,7 +29,7 @@ public class InvoiceServiceTests : IAsyncLifetime
     private readonly Mock<IPaymentServiceClient> _paymentClientMock;
     private readonly Mock<ICustomerServiceClient> _customerClientMock;
     private readonly Mock<IPublishEndpoint> _publishEndpointMock;
-    private static readonly PostgreSqlContainer _postgreSqlContainer = 
+    private static readonly PostgreSqlContainer _postgreSqlContainer =
 #pragma warning disable CS0618
         new PostgreSqlBuilder().WithImage("postgres:18-alpine").Build();
 #pragma warning restore CS0618
@@ -528,6 +529,15 @@ public class InvoiceServiceTests : IAsyncLifetime
         Assert.Equal("THB", result.Currency);
         Assert.Null(result.ExchangeRate);
         Assert.True(string.IsNullOrEmpty(result.ExchangeRateSource));
+        _publishEndpointMock.Verify(
+            endpoint => endpoint.Publish(
+                It.Is<SearchDocumentUpsertedEvent>(message =>
+                    message.Payload.SourceService == "InvoiceService" &&
+                    message.Payload.ResourceType == "invoice" &&
+                    message.Payload.ResourceId == result.Id.ToString() &&
+                    message.Payload.RequiredPermission == "invoice.invoices.read"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
 
         // Verify currency service was never called
         _currencyClientMock.Verify(
@@ -584,7 +594,3 @@ public class InvoiceServiceTests : IAsyncLifetime
 
     #endregion
 }
-
-
-
-

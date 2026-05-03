@@ -6,6 +6,7 @@ using Maliev.InvoiceService.Application.Models.Payments;
 using Maliev.InvoiceService.Application.Services;
 using Maliev.InvoiceService.Application.Services.External;
 using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Infrastructure.Search;
 using Maliev.InvoiceService.Domain.Entities;
 using Maliev.MessagingContracts;
 using Maliev.MessagingContracts.Contracts.Invoices;
@@ -286,6 +287,10 @@ public class InvoiceService : IInvoiceService
                 CreatedAt: new DateTimeOffset(invoice.CreatedAt, TimeSpan.Zero)
             )
         ), cancellationToken);
+
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
+            cancellationToken);
 
         return MapToResponse(invoice);
     }
@@ -908,6 +913,10 @@ public class InvoiceService : IInvoiceService
             _logger.LogInformation("Stored idempotency key {Key} for invoice {InvoiceId}", idempotencyKey, invoice.Id);
         }
 
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
+            cancellationToken);
+
         return response;
     }
 
@@ -959,6 +968,10 @@ public class InvoiceService : IInvoiceService
                 RefundRequired: hadPayments
             )
         ), cancellationToken);
+
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
+            cancellationToken);
 
         return MapToResponse(invoice);
     }
@@ -1079,6 +1092,10 @@ public class InvoiceService : IInvoiceService
             .AsNoTracking()
             .FirstAsync(i => i.Id == id, cancellationToken);
 
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
+            cancellationToken);
+
         return MapToResponse(invoice);
     }
 
@@ -1098,6 +1115,10 @@ public class InvoiceService : IInvoiceService
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Soft deleted invoice {InvoiceId}", invoice.Id);
+
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToDeletedEvent(invoice.Id, DateTimeOffset.UtcNow),
+            cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -1277,6 +1298,17 @@ public class InvoiceService : IInvoiceService
         );
 
         await _publishEndpoint.Publish(evt, cancellationToken);
+
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(parentInvoice, DateTimeOffset.UtcNow),
+            cancellationToken);
+
+        foreach (var childInvoice in childInvoices)
+        {
+            await _publishEndpoint.Publish(
+                InvoiceSearchDocumentMapper.ToUpsertEvent(childInvoice, DateTimeOffset.UtcNow),
+                cancellationToken);
+        }
 
         return childInvoices.Select(MapToResponse).ToList();
     }
@@ -1501,6 +1533,10 @@ public class InvoiceService : IInvoiceService
                 AllocatedAt: new DateTimeOffset(allocation.AllocationDate, TimeSpan.Zero)
             )
         ), cancellationToken);
+
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
+            cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -1752,6 +1788,10 @@ public class InvoiceService : IInvoiceService
         }, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _publishEndpoint.Publish(
+            InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
+            cancellationToken);
     }
 
     /// <inheritdoc/>
