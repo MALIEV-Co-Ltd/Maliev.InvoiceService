@@ -22,6 +22,8 @@ project.assets.json
 *.swp
 *.swo
 *.user
+*.csproj.user
+*.rsuser
 *.suo
 *.userosscache
 *.sln.docstates
