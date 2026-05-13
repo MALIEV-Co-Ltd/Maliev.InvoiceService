@@ -89,10 +89,10 @@ try
     builder.Services.AddHostedService<AuditArchivalService>();
 
     // External Service Clients with Polly v8 Resilience
-    builder.AddServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService");
-    builder.AddServiceClient<IQuotationServiceClient, QuotationServiceClient>("QuotationService");
-    builder.AddServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService");
-    builder.AddServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService");
+    builder.AddAuthenticatedServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService", "invoice");
+    builder.AddAuthenticatedServiceClient<IQuotationServiceClient, QuotationServiceClient>("QuotationService", "invoice");
+    builder.AddAuthenticatedServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService", "invoice");
+    builder.AddAuthenticatedServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService", "invoice");
 
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Maliev.InvoiceService.Api.Program>>();
