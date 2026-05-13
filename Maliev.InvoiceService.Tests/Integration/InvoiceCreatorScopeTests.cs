@@ -29,6 +29,10 @@ public class InvoiceCreatorScopeTests : BaseIntegrationTest
 
         var allowedResponse = await creatorB.GetAsync($"/invoice/v1/invoices/{creatorBInvoiceId}");
         Assert.Equal(HttpStatusCode.OK, allowedResponse.StatusCode);
+
+        var invoice = await allowedResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
+        Assert.NotNull(invoice);
+        Assert.Equal("creator-b", invoice!.CreatedBy);
     }
 
     [Fact]

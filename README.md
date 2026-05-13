@@ -109,6 +109,7 @@ All endpoints are prefixed with `/invoice/v1/`.
 - `roles.invoice.admin`, `roles.invoice.manager`, and `roles.invoice.accountant` are unrestricted financial roles for their granted actions.
 - `roles.invoice.creator` is intentionally object-scoped. Detail, search, update, delete, split, file, audit, currency-report, and payment-link routes check the invoice's `Created` audit log actor before returning or mutating data.
 - Search cache keys include the caller's invoice access scope. Do not add new invoice search caches without including the effective caller scope when results are object-filtered.
+- `InvoiceResponse.CreatedBy` is populated from the invoice creation audit entry so downstream services, including ReceiptService, can enforce their own creator-scoped workflows without guessing.
 - Service-to-service PDF reference registration uses `invoice.files.register` and remains reserved for trusted internal service accounts.
 
 ---

@@ -311,6 +311,7 @@ public class InvoiceService : IInvoiceService
         var invoice = await _context.Invoices
             .Include(i => i.Lines)
             .Include(i => i.ChildInvoices) // Include child invoices
+            .Include(i => i.AuditLogs)
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, cancellationToken);
 
@@ -1669,6 +1670,7 @@ public class InvoiceService : IInvoiceService
             CancellationReason = invoice.CancellationReason,
             PdfFileReference = invoice.PdfFileReference,
             CreatedAt = invoice.CreatedAt,
+            CreatedBy = GetCreatedBy(invoice),
             UpdatedAt = invoice.UpdatedAt,
             Lines = invoice.Lines.Select(l => new InvoiceLineResponse
             {
@@ -1694,6 +1696,15 @@ public class InvoiceService : IInvoiceService
                 DueDate = c.DueDate
             }).ToList()
         };
+    }
+
+    private static string? GetCreatedBy(Invoice invoice)
+    {
+        return invoice.AuditLogs
+            .Where(a => a.EventType == "Created")
+            .OrderBy(a => a.Timestamp)
+            .Select(a => a.ActorId)
+            .FirstOrDefault();
     }
 
     /// <inheritdoc/>

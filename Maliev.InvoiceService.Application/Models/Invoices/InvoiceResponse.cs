@@ -160,6 +160,11 @@ public class InvoiceResponse
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
+    /// Gets or sets the principal that created the invoice, when available from the audit trail.
+    /// </summary>
+    public string? CreatedBy { get; set; }
+
+    /// <summary>
     /// Gets or sets the timestamp when the invoice was last updated (UTC).
     /// </summary>
     public DateTime UpdatedAt { get; set; }

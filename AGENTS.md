@@ -159,6 +159,7 @@ This service's tests cover **Tier 1 (Unit)** and **Tier 2 (Service Integration)*
 - **Environment Variables**: Use `IConfiguration` with environment variable overrides in production.
 - **Permissions**: Use `[RequirePermission(InvoicePermissions.Name)]` on controller actions. Permissions follow the pattern `invoice.invoices.action`.
 - **Creator role scope**: `roles.invoice.creator` is own-invoice scoped through `InvoiceAccessGuard` and `InvoiceAccessScope`. Any endpoint that accepts an invoice ID or returns invoice search results must preserve this guard and must include caller scope in any cache key.
+- **Downstream owner contract**: Keep `InvoiceResponse.CreatedBy` populated from the creation audit entry. ReceiptService depends on it for creator-scoped receipt creation.
 - **Cross-boundary DTOs**: Before changing controller requests, BFF callers, service clients, or MassTransit invoice/payment/PDF events, verify DTOs, JSON property names, and wire-shape tests on both sides of the boundary.
 
 ---
