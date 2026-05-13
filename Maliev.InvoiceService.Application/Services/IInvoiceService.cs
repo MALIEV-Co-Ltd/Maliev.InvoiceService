@@ -50,6 +50,18 @@ public interface IInvoiceService
     Task<PaginatedResponse<InvoiceResponse>> SearchInvoicesAsync(InvoiceSearchRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Searches invoices using comprehensive filtering and caller-specific visibility constraints.
+    /// </summary>
+    /// <param name="request">Search request with filters, date ranges, sorting options, and pagination.</param>
+    /// <param name="accessScope">Caller-specific invoice visibility scope.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Paginated response containing matching invoices.</returns>
+    Task<PaginatedResponse<InvoiceResponse>> SearchInvoicesAsync(
+        InvoiceSearchRequest request,
+        InvoiceAccessScope accessScope,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Finalizes a draft invoice, assigning a sequential invoice number and making it immutable.
     /// Only invoices in Draft status can be finalized.
     /// Supports idempotency to prevent duplicate finalization on network retries.

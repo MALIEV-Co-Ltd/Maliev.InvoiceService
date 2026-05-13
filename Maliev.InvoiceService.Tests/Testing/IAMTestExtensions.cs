@@ -10,11 +10,28 @@ public static class IAMTestExtensions
 {
     public static HttpClient WithTestAuth(this HttpClient client, TestWebApplicationFactory factory, params string[] permissions)
     {
+        return client.WithTestAuth(factory, Guid.NewGuid().ToString(), Array.Empty<string>(), permissions);
+    }
+
+    public static HttpClient WithTestAuth(
+        this HttpClient client,
+        TestWebApplicationFactory factory,
+        string userId,
+        string[] roles,
+        params string[] permissions)
+    {
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(ClaimTypes.NameIdentifier, userId),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+            claims.Add(new Claim("role", role));
+        }
 
         foreach (var permission in permissions)
         {

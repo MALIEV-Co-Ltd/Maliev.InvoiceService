@@ -48,6 +48,7 @@ To maintain high performance and low complexity, the following are **NOT** used:
 - **Audit-First Design**: Automatic, immutable audit logging via interceptors for all commercial mutations.
 - **Anti-Tamper Logic**: Database-level protection preventing the deletion or modification of finalized financial documents.
 - **Multi-Currency Support**: Fully integrated with the platform's exchange rate providers for international invoicing.
+- **Creator Ownership Scope**: `roles.invoice.creator` can create, read, update, split, and attach files only for invoices whose creation audit entry belongs to that principal.
 
 ---
 
@@ -99,6 +100,16 @@ All endpoints are prefixed with `/invoice/v1/`.
 | GET | `/invoices/{id}` | Retrieve detailed invoice details |
 | POST | `/invoices/{id}/finalize` | Commit and finalize a draft invoice |
 | POST | `/payments` | Record and allocate a payment |
+
+---
+
+## Authorization Model
+
+- All controller actions use `[RequirePermission]` with `invoice.*` permission strings.
+- `roles.invoice.admin`, `roles.invoice.manager`, and `roles.invoice.accountant` are unrestricted financial roles for their granted actions.
+- `roles.invoice.creator` is intentionally object-scoped. Detail, search, update, delete, split, file, audit, currency-report, and payment-link routes check the invoice's `Created` audit log actor before returning or mutating data.
+- Search cache keys include the caller's invoice access scope. Do not add new invoice search caches without including the effective caller scope when results are object-filtered.
+- Service-to-service PDF reference registration uses `invoice.files.register` and remains reserved for trusted internal service accounts.
 
 ---
 

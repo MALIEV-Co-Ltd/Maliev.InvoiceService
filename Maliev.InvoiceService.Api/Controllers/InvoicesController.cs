@@ -17,20 +17,31 @@ namespace Maliev.InvoiceService.Api.Controllers;
 public class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
+    private readonly InvoiceAccessGuard _accessGuard;
     private readonly ILogger<InvoicesController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InvoicesController"/> class.
     /// </summary>
     /// <param name="invoiceService">The invoice service for business logic operations.</param>
+    /// <param name="accessGuard">Invoice object-scope access guard.</param>
     /// <param name="logger">The logger instance for this controller.</param>
-    public InvoicesController(IInvoiceService invoiceService, ILogger<InvoicesController> logger)
+    public InvoicesController(
+        IInvoiceService invoiceService,
+        InvoiceAccessGuard accessGuard,
+        ILogger<InvoicesController> logger)
     {
         _invoiceService = invoiceService;
+        _accessGuard = accessGuard;
         _logger = logger;
     }
 
     private string CorrelationId => HttpContext.Items["CorrelationId"]?.ToString() ?? Guid.NewGuid().ToString();
+
+    private async Task<InvoiceAccessDecision> CheckInvoiceAccessAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await _accessGuard.CheckInvoiceAsync(id, User, cancellationToken);
+    }
 
     /// <summary>
     /// Creates a new draft invoice.
@@ -80,6 +91,10 @@ public class InvoicesController : ControllerBase
     {
         _logger.LogDebug("[{CorrelationId}] Retrieving invoice {InvoiceId}", CorrelationId, id);
 
+        var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+        if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+        if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
         var invoice = await _invoiceService.GetInvoiceByIdAsync(id, cancellationToken);
 
         if (invoice == null)
@@ -109,7 +124,7 @@ public class InvoicesController : ControllerBase
     {
         _logger.LogDebug("[{CorrelationId}] Searching invoices with filters", CorrelationId);
 
-        var result = await _invoiceService.SearchInvoicesAsync(request, cancellationToken);
+        var result = await _invoiceService.SearchInvoicesAsync(request, _accessGuard.GetScope(User), cancellationToken);
 
         _logger.LogDebug("[{CorrelationId}] Found {TotalCount} invoices matching search criteria", CorrelationId, result.TotalCount);
 
@@ -182,6 +197,10 @@ public class InvoicesController : ControllerBase
 
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             var invoice = await _invoiceService.FinalizeInvoiceAsync(id, request.FinalizedBy, idempotencyKey, cancellationToken);
 
             _logger.LogInformation("[{CorrelationId}] Finalized invoice {InvoiceId} with number {InvoiceNumber}",
@@ -219,6 +238,10 @@ public class InvoicesController : ControllerBase
     {
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             var invoice = await _invoiceService.CancelInvoiceAsync(id, request.CancelledBy, request.CancellationReason, cancellationToken);
             return Ok(invoice);
         }
@@ -255,6 +278,10 @@ public class InvoicesController : ControllerBase
     {
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             var invoice = await _invoiceService.UpdateInvoiceAsync(id, request, cancellationToken);
             return Ok(invoice);
         }
@@ -290,6 +317,10 @@ public class InvoicesController : ControllerBase
     {
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             await _invoiceService.DeleteInvoiceAsync(id, cancellationToken);
             return NoContent();
         }
@@ -336,6 +367,10 @@ public class InvoicesController : ControllerBase
 
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             var childInvoices = await _invoiceService.SplitInvoiceAsync(id, request, splitBy, cancellationToken);
 
             _logger.LogInformation("[{CorrelationId}] Successfully split invoice {InvoiceId}", CorrelationId, id);
@@ -378,6 +413,10 @@ public class InvoicesController : ControllerBase
     {
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             var fileReference = await _invoiceService.RegisterFileAsync(id, request, cancellationToken);
             var apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
             return CreatedAtAction(nameof(GetFiles), new { id, version = apiVersion }, fileReference);
@@ -408,6 +447,10 @@ public class InvoicesController : ControllerBase
     [ProducesResponseType(typeof(List<FileReferenceResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<FileReferenceResponse>>> GetFiles(Guid id, CancellationToken cancellationToken)
     {
+        var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+        if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+        if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
         var files = await _invoiceService.GetFileReferencesAsync(id, cancellationToken);
         return Ok(files);
     }
@@ -431,6 +474,10 @@ public class InvoicesController : ControllerBase
     {
         try
         {
+            var accessDecision = await CheckInvoiceAccessAsync(id, cancellationToken);
+            if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
+
             _logger.LogInformation("[{CorrelationId}] Retrieving currency conversion report for invoice {InvoiceId}", CorrelationId, id);
 
             var report = await _invoiceService.GetCurrencyConversionReportAsync(id, cancellationToken);

@@ -81,6 +81,7 @@ try
     builder.Services.AddControllers();
     builder.Services.AddMemoryCache();
     // Services
+    builder.Services.AddScoped<Maliev.InvoiceService.Api.Authorization.InvoiceAccessGuard>();
     builder.Services.AddScoped<IInvoiceService, InvoiceService>();
     builder.Services.AddScoped<IBillingNoteService, BillingNoteService>();
 

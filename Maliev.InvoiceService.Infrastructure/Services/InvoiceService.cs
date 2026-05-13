@@ -373,8 +373,17 @@ public class InvoiceService : IInvoiceService
     /// <inheritdoc/>
     public async Task<PaginatedResponse<InvoiceResponse>> SearchInvoicesAsync(InvoiceSearchRequest request, CancellationToken cancellationToken = default)
     {
+        return await SearchInvoicesAsync(request, new InvoiceAccessScope(string.Empty, RestrictToCreatedInvoices: false), cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<PaginatedResponse<InvoiceResponse>> SearchInvoicesAsync(
+        InvoiceSearchRequest request,
+        InvoiceAccessScope accessScope,
+        CancellationToken cancellationToken = default)
+    {
         // Try to get from cache first (5-minute TTL)
-        var cacheKey = $"invoice:search:{JsonSerializer.Serialize(request)}";
+        var cacheKey = $"invoice:search:{accessScope.CacheKey}:{JsonSerializer.Serialize(request)}";
         var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
 
         if (!string.IsNullOrEmpty(cachedData))
@@ -387,6 +396,8 @@ public class InvoiceService : IInvoiceService
             .Include(i => i.Lines)
             .Where(i => !i.IsDeleted)
             .AsNoTracking();
+
+        query = ApplyAccessScope(query, accessScope);
 
         // Exclude cancelled invoices by default (T124)
         if (!request.IncludeCancelled)
@@ -531,6 +542,23 @@ public class InvoiceService : IInvoiceService
         _logger.LogDebug("Cached search results for key {CacheKey} with 5-minute TTL", cacheKey);
 
         return result;
+    }
+
+    private static IQueryable<Invoice> ApplyAccessScope(IQueryable<Invoice> query, InvoiceAccessScope accessScope)
+    {
+        if (!accessScope.RestrictToCreatedInvoices)
+        {
+            return query;
+        }
+
+        if (string.IsNullOrWhiteSpace(accessScope.PrincipalId))
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(i => i.AuditLogs.Any(a =>
+            a.EventType == "Created" &&
+            a.ActorId == accessScope.PrincipalId));
     }
 
     /// <inheritdoc/>

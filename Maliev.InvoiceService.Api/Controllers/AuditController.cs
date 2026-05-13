@@ -16,16 +16,22 @@ namespace Maliev.InvoiceService.Api.Controllers;
 public class AuditController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
+    private readonly InvoiceAccessGuard _accessGuard;
     private readonly ILogger<AuditController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AuditController"/> class.
     /// </summary>
     /// <param name="invoiceService">The invoice service for retrieving audit data.</param>
+    /// <param name="accessGuard">Invoice object-scope access guard.</param>
     /// <param name="logger">The logger instance for this controller.</param>
-    public AuditController(IInvoiceService invoiceService, ILogger<AuditController> logger)
+    public AuditController(
+        IInvoiceService invoiceService,
+        InvoiceAccessGuard accessGuard,
+        ILogger<AuditController> logger)
     {
         _invoiceService = invoiceService;
+        _accessGuard = accessGuard;
         _logger = logger;
     }
 
@@ -46,6 +52,10 @@ public class AuditController : ControllerBase
         try
         {
             _logger.LogDebug("Retrieving audit trail for invoice {InvoiceId}", id);
+
+            var decision = await _accessGuard.CheckInvoiceAsync(id, User, cancellationToken);
+            if (decision == InvoiceAccessDecision.NotFound) return NotFound();
+            if (decision == InvoiceAccessDecision.Forbidden) return Forbid();
 
             var auditTrail = await _invoiceService.GetAuditTrailAsync(id, cancellationToken);
 

@@ -17,16 +17,22 @@ namespace Maliev.InvoiceService.Api.Controllers;
 public class PaymentsController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
+    private readonly InvoiceAccessGuard _accessGuard;
     private readonly ILogger<PaymentsController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PaymentsController"/> class.
     /// </summary>
     /// <param name="invoiceService">The invoice service for payment operations.</param>
+    /// <param name="accessGuard">Invoice object-scope access guard.</param>
     /// <param name="logger">The logger instance for this controller.</param>
-    public PaymentsController(IInvoiceService invoiceService, ILogger<PaymentsController> logger)
+    public PaymentsController(
+        IInvoiceService invoiceService,
+        InvoiceAccessGuard accessGuard,
+        ILogger<PaymentsController> logger)
     {
         _invoiceService = invoiceService;
+        _accessGuard = accessGuard;
         _logger = logger;
     }
 
@@ -82,6 +88,10 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> LinkPaymentToInvoice(Guid invoiceId, [FromBody] LinkPaymentRequest request, CancellationToken cancellationToken)
     {
+        var decision = await _accessGuard.CheckInvoiceAsync(invoiceId, User, cancellationToken);
+        if (decision == InvoiceAccessDecision.NotFound) return NotFound();
+        if (decision == InvoiceAccessDecision.Forbidden) return Forbid();
+
         var invoice = await _invoiceService.LinkPaymentAsync(invoiceId, request, cancellationToken);
         return Ok(invoice);
     }
