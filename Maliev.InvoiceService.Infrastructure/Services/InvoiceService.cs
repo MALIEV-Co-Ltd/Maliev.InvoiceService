@@ -1296,6 +1296,7 @@ public class InvoiceService : IInvoiceService
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        await _cache.RemoveAsync($"invoice:{parentInvoice.Id}", cancellationToken);
 
         _logger.LogInformation("Split invoice {ParentId} into {Count} children by {User}", parentInvoice.Id, childInvoices.Count, splitBy);
 

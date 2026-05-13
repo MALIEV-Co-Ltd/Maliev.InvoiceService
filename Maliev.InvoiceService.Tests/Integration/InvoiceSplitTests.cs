@@ -19,6 +19,8 @@ public class InvoiceSplitTests : BaseIntegrationTest
 
         // Arrange - Create and finalize invoice
         var invoiceId = await CreateAndFinalizeInvoiceAsync();
+        var cachedParent = await Client.GetFromJsonAsync<InvoiceResponse>($"/invoice/v1/invoices/{invoiceId}");
+        Assert.Equal("Finalized", cachedParent!.Status);
 
         // Act - Split invoice 50/50
         var splitRequest = new SplitInvoiceRequest
@@ -53,6 +55,10 @@ public class InvoiceSplitTests : BaseIntegrationTest
             Assert.Equal(invoiceId, child.ParentInvoiceId);
             Assert.Equal("Finalized", child.Status);
         }
+
+        var parentAfterSplit = await Client.GetFromJsonAsync<InvoiceResponse>($"/invoice/v1/invoices/{invoiceId}");
+        Assert.Equal("Split", parentAfterSplit!.Status);
+        Assert.Equal(2, parentAfterSplit.ChildInvoiceSummaries.Count);
     }
 
     [Fact]
