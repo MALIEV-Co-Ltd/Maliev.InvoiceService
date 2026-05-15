@@ -1711,12 +1711,13 @@ public class InvoiceService : IInvoiceService
     /// <inheritdoc/>
     public async Task<FileReferenceResponse> RegisterFileAsync(Guid invoiceId, RegisterFileRequest request, CancellationToken cancellationToken = default)
     {
-        var invoice = await _context.Invoices.FindAsync(new object[] { invoiceId }, cancellationToken);
+        var invoice = await _context.Invoices
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && !i.IsDeleted, cancellationToken);
         if (invoice == null)
             throw new KeyNotFoundException($"Invoice {invoiceId} not found");
 
-        if (invoice.Status != "Finalized")
-            throw new InvalidOperationException($"Cannot register file for invoice in {invoice.Status} status. Invoice must be finalized.");
+        if (string.Equals(invoice.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Cannot register file for cancelled invoice.");
 
         var fileReference = new FileReference
         {

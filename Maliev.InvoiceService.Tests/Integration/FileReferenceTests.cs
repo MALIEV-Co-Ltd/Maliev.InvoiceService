@@ -130,7 +130,7 @@ public class FileReferenceTests : BaseIntegrationTest
     }
 
     [Fact]
-    public async Task RegisterFileReference_ForDraftInvoice_Fails()
+    public async Task RegisterFileReference_ForDraftInvoice_StoresFileMetadata()
     {
         // Arrange - Clean database for test isolation
         await CleanDatabaseAsync();
@@ -154,18 +154,24 @@ public class FileReferenceTests : BaseIntegrationTest
         var createResponse = await Client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
         var draft = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
 
-        // Act - Try to register file for draft invoice
+        // Act - Register customer PO or supporting evidence before invoice finalization.
         var fileRequest = new RegisterFileRequest
         {
-            FileType = "PDF",
-            FileUrl = "https://storage.example.com/draft.pdf",
+            FileType = "CustomerPO",
+            FileUrl = "https://storage.example.com/customer-po.pdf",
             FileSizeBytes = 10000,
-            GeneratedBy = "pdf-service"
+            GeneratedBy = "Maliev.Intranet"
         };
         var fileResponse = await Client.PostAsJsonAsync($"/invoice/v1/invoices/{draft!.Id}/files", fileRequest);
 
-        // Assert - Should fail (only finalized invoices can have files registered)
-        Assert.Equal(System.Net.HttpStatusCode.Conflict, fileResponse.StatusCode);
+        // Assert
+        fileResponse.EnsureSuccessStatusCode();
+        var fileRef = await fileResponse.Content.ReadFromJsonAsync<FileReferenceResponse>();
+        Assert.NotNull(fileRef);
+        Assert.Equal(draft.Id, fileRef!.InvoiceId);
+        Assert.Equal("CustomerPO", fileRef.FileType);
+        Assert.Equal("https://storage.example.com/customer-po.pdf", fileRef.FileUrl);
+        Assert.Equal("Maliev.Intranet", fileRef.GeneratedBy);
     }
 
     #endregion
