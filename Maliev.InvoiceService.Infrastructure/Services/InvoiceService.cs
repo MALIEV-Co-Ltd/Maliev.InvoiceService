@@ -170,8 +170,8 @@ public class InvoiceService : IInvoiceService
             PoNumber = request.PoNumber,
             DocumentType = request.DocumentType,
             Currency = request.Currency,
-            IssueDate = request.IssueDate.Date,
-            DueDate = request.DueDate.Date,
+            IssueDate = NormalizeDateOnly(request.IssueDate),
+            DueDate = NormalizeDateOnly(request.DueDate),
             PaymentTermsDays = request.PaymentTermsDays,
             CreditTermCode = request.CreditTermCode,
             LateFeePercentage = request.LateFeePercentage,
@@ -283,7 +283,7 @@ public class InvoiceService : IInvoiceService
                 CustomerId: invoice.CustomerId,
                 TotalAmount: (double)invoice.GrandTotal,
                 Currency: invoice.Currency,
-                DueDate: invoice.DueDate != default ? new DateTimeOffset(invoice.DueDate, TimeSpan.Zero) : null,
+                DueDate: ToUtcDateOnlyOffset(invoice.DueDate),
                 CreatedAt: new DateTimeOffset(invoice.CreatedAt, TimeSpan.Zero)
             )
         ), cancellationToken);
@@ -2010,5 +2010,17 @@ public class InvoiceService : IInvoiceService
         };
 
         return summary;
+    }
+
+    private static DateTime NormalizeDateOnly(DateTime value)
+    {
+        return DateTime.SpecifyKind(value.Date, DateTimeKind.Unspecified);
+    }
+
+    private static DateTimeOffset? ToUtcDateOnlyOffset(DateTime value)
+    {
+        return value == default
+            ? null
+            : new DateTimeOffset(NormalizeDateOnly(value), TimeSpan.Zero);
     }
 }

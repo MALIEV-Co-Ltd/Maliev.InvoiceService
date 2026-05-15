@@ -5,6 +5,7 @@ using Maliev.InvoiceService.Infrastructure.Persistence;
 using Maliev.InvoiceService.Infrastructure.Services;
 using Maliev.InvoiceService.Domain.Entities;
 using Maliev.InvoiceService.Application.Models;
+using Maliev.MessagingContracts.Contracts.Invoices;
 using Maliev.MessagingContracts.Contracts.Search;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -544,6 +545,80 @@ public class InvoiceServiceTests : IAsyncLifetime
             x => x.GetExchangeRateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Never
         );
+
+        await transaction.RollbackAsync();
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_WithLocalDateInputs_PublishesDateOnlyOffsetWithoutThrowing()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var customerId = Guid.NewGuid();
+        var issueDate = new DateTime(2026, 5, 15, 9, 30, 0, DateTimeKind.Local);
+        var dueDate = new DateTime(2026, 6, 14, 18, 0, 0, DateTimeKind.Local);
+
+        _customerClientMock
+            .Setup(x => x.GetCustomerByIdAsync(customerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Maliev.InvoiceService.Application.Models.Customers.CustomerResponse
+            {
+                Id = customerId,
+                FirstName = "Test",
+                LastName = "Customer",
+                CompanyId = Guid.NewGuid(),
+                CompanyName = "Test Company"
+            });
+
+        var service = new Maliev.InvoiceService.Infrastructure.Services.InvoiceService(
+            context,
+            _loggerMock.Object,
+            _cacheMock.Object,
+            _currencyClientMock.Object,
+            _quotationClientMock.Object,
+            _paymentClientMock.Object,
+            _customerClientMock.Object,
+            _publishEndpointMock.Object
+        );
+
+        var request = new CreateInvoiceRequest
+        {
+            CustomerId = customerId,
+            CustomerName = "Test Customer",
+            CustomerTaxId = "0105556000001",
+            BillingAddress = "88 Test Road, Bangkok 10110",
+            Currency = "THB",
+            IssueDate = issueDate,
+            DueDate = dueDate,
+            Lines = new List<InvoiceLineItemRequest>
+            {
+                new InvoiceLineItemRequest
+                {
+                    LineNumber = 1,
+                    Description = "Test Item",
+                    Quantity = 1,
+                    UnitPrice = 100m,
+                    TaxRate = 7m
+                }
+            }
+        };
+
+        // Act
+        var result = await service.CreateInvoiceAsync(request, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(issueDate.Date, result.IssueDate);
+        Assert.Equal(dueDate.Date, result.DueDate);
+        _publishEndpointMock.Verify(
+            endpoint => endpoint.Publish(
+                It.Is<InvoiceCreatedEvent>(message =>
+                    message.Payload.InvoiceId == result.Id &&
+                    message.Payload.DueDate.HasValue &&
+                    message.Payload.DueDate.Value.Offset == TimeSpan.Zero &&
+                    message.Payload.DueDate.Value.UtcDateTime.Date == dueDate.Date),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
 
         await transaction.RollbackAsync();
     }
