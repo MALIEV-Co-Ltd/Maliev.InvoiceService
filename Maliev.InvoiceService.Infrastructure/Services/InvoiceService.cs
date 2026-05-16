@@ -312,6 +312,7 @@ public class InvoiceService : IInvoiceService
             .Include(i => i.Lines)
             .Include(i => i.ChildInvoices) // Include child invoices
             .Include(i => i.AuditLogs)
+            .Include(i => i.InvoicePaymentAllocations)
             .AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted, cancellationToken);
 
@@ -395,6 +396,7 @@ public class InvoiceService : IInvoiceService
 
         var query = _context.Invoices
             .Include(i => i.Lines)
+            .Include(i => i.InvoicePaymentAllocations)
             .Where(i => !i.IsDeleted)
             .AsNoTracking();
 
@@ -1640,6 +1642,11 @@ public class InvoiceService : IInvoiceService
 
     private static InvoiceResponse MapToResponse(Invoice invoice)
     {
+        var paidAmount = invoice.InvoicePaymentAllocations
+            .Where(allocation => string.Equals(allocation.AllocationStatus, "Confirmed", StringComparison.OrdinalIgnoreCase))
+            .Sum(allocation => allocation.AllocatedAmount);
+        var outstandingBalance = Math.Max(invoice.GrandTotal - paidAmount, 0m);
+
         return new InvoiceResponse
         {
             Id = invoice.Id,
@@ -1660,6 +1667,8 @@ public class InvoiceService : IInvoiceService
             TaxAmount = invoice.TaxAmount,
             WithholdingTaxAmount = invoice.WithholdingTaxAmount,
             GrandTotal = invoice.GrandTotal,
+            PaidAmount = paidAmount,
+            OutstandingBalance = outstandingBalance,
             IssueDate = invoice.IssueDate,
             DueDate = invoice.DueDate,
             PaymentTermsDays = invoice.PaymentTermsDays,

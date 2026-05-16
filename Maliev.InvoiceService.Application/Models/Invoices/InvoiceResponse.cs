@@ -99,6 +99,16 @@ public class InvoiceResponse
     public decimal GrandTotal { get; set; }
 
     /// <summary>
+    /// Gets or sets the total confirmed payment amount allocated to this invoice.
+    /// </summary>
+    public decimal PaidAmount { get; set; }
+
+    /// <summary>
+    /// Gets or sets the remaining confirmed outstanding balance for this invoice.
+    /// </summary>
+    public decimal OutstandingBalance { get; set; }
+
+    /// <summary>
     /// Gets or sets the invoice issue date.
     /// </summary>
     public DateTime IssueDate { get; set; }

@@ -51,6 +51,8 @@ public class PaymentLinkingTests : BaseIntegrationTest
 
         Assert.NotNull(updatedInvoice);
         Assert.Equal("PartiallyPaid", updatedInvoice!.Status);
+        Assert.Equal(500m, updatedInvoice.PaidAmount);
+        Assert.Equal(570m, updatedInvoice.OutstandingBalance);
     }
 
     [Fact]
@@ -87,6 +89,8 @@ public class PaymentLinkingTests : BaseIntegrationTest
 
         Assert.NotNull(updatedInvoice);
         Assert.Equal("FullyPaid", updatedInvoice!.Status);
+        Assert.Equal(1070m, updatedInvoice.PaidAmount);
+        Assert.Equal(0m, updatedInvoice.OutstandingBalance);
     }
 
     [Fact]
@@ -138,6 +142,8 @@ public class PaymentLinkingTests : BaseIntegrationTest
 
         Assert.NotNull(updatedInvoice);
         Assert.Equal("FullyPaid", updatedInvoice!.Status);
+        Assert.Equal(1000m, updatedInvoice.PaidAmount);
+        Assert.Equal(0m, updatedInvoice.OutstandingBalance);
     }
 
     private async Task<Guid> CreateAndFinalizeInvoiceAsync(decimal grandTotal)
