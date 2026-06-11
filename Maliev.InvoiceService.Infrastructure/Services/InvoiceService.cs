@@ -1381,6 +1381,55 @@ public class InvoiceService : IInvoiceService
     }
 
     /// <inheritdoc/>
+    public async Task<PaymentResponse> RecordExternalPaymentAsync(Guid paymentId, CreatePaymentRequest request, CancellationToken cancellationToken = default)
+    {
+        var existing = await _context.Payments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken);
+        if (existing != null)
+        {
+            _logger.LogInformation("External payment {PaymentId} already recorded; returning existing row", paymentId);
+            return MapPaymentToResponse(existing);
+        }
+
+        var payment = new Payment
+        {
+            Id = paymentId,
+            PaymentAmount = request.PaymentAmount,
+            PaymentDate = request.PaymentDate.Date,
+            PaymentMethod = request.PaymentMethod,
+            ReferenceNumber = request.ReferenceNumber,
+            Notes = request.Notes,
+            RecordedBy = request.RecordedBy,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Payments.Add(payment);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException
+        {
+            SqlState: Npgsql.PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "pk_payments"
+        })
+        {
+            _context.Entry(payment).State = EntityState.Detached;
+            var persistedPayment = await _context.Payments
+                .AsNoTracking()
+                .SingleAsync(p => p.Id == paymentId, cancellationToken);
+
+            _logger.LogInformation("External payment {PaymentId} was already recorded concurrently; returning existing row", paymentId);
+            return MapPaymentToResponse(persistedPayment);
+        }
+
+        _logger.LogInformation("Recorded external payment {PaymentId} for amount {Amount}", payment.Id, payment.PaymentAmount);
+
+        return MapPaymentToResponse(payment);
+    }
+
+    /// <inheritdoc/>
     public async Task<InvoiceResponse> LinkPaymentAsync(Guid invoiceId, LinkPaymentRequest request, CancellationToken cancellationToken = default)
     {
         // Delegate to AllocatePaymentAsync for payment allocation
@@ -1878,18 +1927,20 @@ public class InvoiceService : IInvoiceService
         if (payment == null)
             return null;
 
-        return new PaymentResponse
-        {
-            Id = payment.Id,
-            PaymentAmount = payment.PaymentAmount,
-            PaymentDate = payment.PaymentDate,
-            PaymentMethod = payment.PaymentMethod,
-            ReferenceNumber = payment.ReferenceNumber,
-            Notes = payment.Notes,
-            RecordedBy = payment.RecordedBy,
-            CreatedAt = payment.CreatedAt
-        };
+        return MapPaymentToResponse(payment);
     }
+
+    private static PaymentResponse MapPaymentToResponse(Payment payment) => new()
+    {
+        Id = payment.Id,
+        PaymentAmount = payment.PaymentAmount,
+        PaymentDate = payment.PaymentDate,
+        PaymentMethod = payment.PaymentMethod,
+        ReferenceNumber = payment.ReferenceNumber,
+        Notes = payment.Notes,
+        RecordedBy = payment.RecordedBy,
+        CreatedAt = payment.CreatedAt
+    };
 
     // T156: Currency conversion reporting
     /// <inheritdoc/>

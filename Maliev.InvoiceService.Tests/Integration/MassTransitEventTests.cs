@@ -4,6 +4,7 @@ using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Application.Models.Payments;
 using Maliev.InvoiceService.Api.Authorization;
 using Maliev.InvoiceService.Tests.Fixtures;
+using MassTransit;
 using MassTransit.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -13,6 +14,8 @@ using Maliev.MessagingContracts.Contracts.Payments;
 using Maliev.MessagingContracts.Contracts.Orders;
 using Maliev.MessagingContracts.Contracts.Pdf;
 using Maliev.MessagingContracts.Contracts.Search;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.InvoiceService.Tests.Integration;
 
@@ -564,12 +567,14 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     }
 
     [Fact]
-    public async Task OrderPaidEventConsumer_ShouldLogOrderPayment()
+    public async Task OrderPaidEventConsumer_ShouldRecordOrderPayment()
     {
         // Arrange
         await _factory.CleanDatabaseAsync();
         var orderId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
+        var paidAmount = 2000.00m;
+        var orderNumber = "ORD-67890";
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -590,25 +595,37 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                 IsPublic: false,
                 Payload: new OrderPaidEventPayload(
                     OrderId: orderId,
-                    OrderNumber: "ORD-67890",
+                    OrderNumber: orderNumber,
                     PaymentId: paymentId,
-                    PaidAmount: 2000.00,
+                    PaidAmount: (double)paidAmount,
                     Currency: "THB",
                     PaidAt: DateTimeOffset.UtcNow
                 )
             );
 
             await harness.Bus.Publish(orderPaidEvent);
+            await harness.Bus.Publish(orderPaidEvent);
 
             // Wait for consumer to process
             Assert.True(await harness.Consumed.Any<OrderPaidEvent>(),
                 "OrderPaidEvent should be consumed");
-
             // Give time for async processing
             await Task.Delay(500);
+            Assert.False(await harness.Published.Any<Fault<OrderPaidEvent>>(),
+                "Duplicate OrderPaidEvent deliveries should not fault the consumer");
 
-            // Assert - Consumer should process without error (logs order payment)
-            // Since this consumer only logs, we just verify it was consumed successfully
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
+            var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.Id == paymentId);
+            var paymentCount = await db.Payments.AsNoTracking().CountAsync(p => p.Id == paymentId);
+
+            Assert.NotNull(payment);
+            Assert.Equal(1, paymentCount);
+            Assert.Equal(paidAmount, payment.PaymentAmount);
+            Assert.Equal("Stripe", payment.PaymentMethod);
+            Assert.Equal(orderNumber, payment.ReferenceNumber);
+            Assert.Contains(orderId.ToString(), payment.Notes);
+            Assert.Equal("OrderService", payment.RecordedBy);
         }
         finally
         {

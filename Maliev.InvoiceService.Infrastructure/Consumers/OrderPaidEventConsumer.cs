@@ -1,4 +1,5 @@
 using Maliev.InvoiceService.Application.Services;
+using Maliev.InvoiceService.Application.Models.Payments;
 using Maliev.MessagingContracts.Contracts.Orders;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -34,9 +35,19 @@ public partial class OrderPaidEventConsumer : IConsumer<OrderPaidEvent>
 
         try
         {
-            // OrderPaidEvent doesn't contain enough info to auto-create invoice
-            // This consumer serves as a placeholder for future enhancement
-            // When needed, call OrderService API to get full order details
+            _ = await _invoiceService.RecordExternalPaymentAsync(
+                payload.PaymentId,
+                new CreatePaymentRequest
+                {
+                    PaymentAmount = (decimal)payload.PaidAmount,
+                    PaymentDate = payload.PaidAt.UtcDateTime,
+                    PaymentMethod = "Stripe",
+                    ReferenceNumber = payload.OrderNumber,
+                    Notes = $"Order {payload.OrderNumber} ({payload.OrderId}) paid via PaymentService event.",
+                    RecordedBy = "OrderService"
+                },
+                context.CancellationToken);
+
             Log.OrderPaidEventReceived(_logger, payload.OrderId, payload.OrderNumber, payload.PaidAmount, payload.Currency);
         }
         catch (Exception ex)

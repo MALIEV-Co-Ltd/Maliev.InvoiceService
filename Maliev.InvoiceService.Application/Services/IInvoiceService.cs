@@ -174,6 +174,15 @@ public interface IInvoiceService
     Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Records an externally-created payment by its provider/payment-service identifier.
+    /// </summary>
+    /// <param name="paymentId">External payment identifier.</param>
+    /// <param name="request">Payment details to record.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Existing or created payment details.</returns>
+    Task<PaymentResponse> RecordExternalPaymentAsync(Guid paymentId, CreatePaymentRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves a payment by its unique identifier.
     /// </summary>
     /// <param name="id">Payment ID.</param>
