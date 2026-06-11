@@ -434,6 +434,11 @@ public class InvoiceService : IInvoiceService
             query = query.Where(i => i.InvoiceNumber != null && i.InvoiceNumber.Contains(request.InvoiceNumber));
         }
 
+        if (!string.IsNullOrEmpty(request.PoNumber))
+        {
+            query = query.Where(i => i.PoNumber == request.PoNumber);
+        }
+
         // Date range filters
         if (request.IssueDateFrom.HasValue)
         {

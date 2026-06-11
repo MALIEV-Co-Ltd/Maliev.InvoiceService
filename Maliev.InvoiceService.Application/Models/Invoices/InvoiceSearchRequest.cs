@@ -42,6 +42,11 @@ public class InvoiceSearchRequest
     /// </summary>
     public string? InvoiceNumber { get; set; }
 
+    /// <summary>
+    /// Gets or sets the customer purchase order number filter (exact match).
+    /// </summary>
+    public string? PoNumber { get; set; }
+
     // Date range filters
 
     /// <summary>

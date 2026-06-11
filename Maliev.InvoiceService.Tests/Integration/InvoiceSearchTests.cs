@@ -125,9 +125,33 @@ public class InvoiceSearchTests : BaseIntegrationTest
         });
     }
 
+    [Fact]
+    public async Task SearchInvoices_FilterByPoNumber_ReturnsOnlyMatchingInvoices()
+    {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
+        var customerId = Guid.NewGuid();
+        var targetInvoiceId = await CreateInvoiceAsync(customerId, "Target PO Customer", finalize: false, poNumber: "PO-LIFECYCLE-001");
+        await CreateInvoiceAsync(customerId, "Other PO Customer", finalize: false, poNumber: "PO-LIFECYCLE-002");
+
+        // Act - Intranet order lifecycle lookup sends this exact query parameter.
+        var response = await Client.GetAsync("/invoice/v1/invoices?poNumber=PO-LIFECYCLE-001&pageSize=10");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResponse<InvoiceResponse>>();
+
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Items);
+        var invoice = Assert.Single(result.Items);
+        Assert.Equal(targetInvoiceId, invoice.Id);
+        Assert.Equal("PO-LIFECYCLE-001", invoice.PoNumber);
+    }
+
     #endregion
 
-    private async Task<Guid> CreateInvoiceAsync(Guid customerId, string customerName, bool finalize)
+    private async Task<Guid> CreateInvoiceAsync(Guid customerId, string customerName, bool finalize, string? poNumber = null)
     {
         var request = new CreateInvoiceRequest
         {
@@ -139,6 +163,7 @@ public class InvoiceSearchTests : BaseIntegrationTest
             IssueDate = DateTime.UtcNow.Date,
             DueDate = DateTime.UtcNow.Date.AddDays(30),
             PaymentTermsDays = 30,
+            PoNumber = poNumber,
             Lines = new List<InvoiceLineItemRequest>
             {
                 new() { LineNumber = 1, Description = "Product", Quantity = 1, UnitPrice = 1000, TaxRate = 7 }
