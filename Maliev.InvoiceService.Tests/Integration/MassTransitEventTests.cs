@@ -542,6 +542,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                 Payload: new PaymentCompletedEventPayload(
                     OrderId: orderId,
                     OrderNumber: "ORD-12345",
+                    CustomerId: Guid.NewGuid().ToString(),
                     PaymentId: paymentId,
                     Amount: 1500.00,
                     Currency: "THB"
