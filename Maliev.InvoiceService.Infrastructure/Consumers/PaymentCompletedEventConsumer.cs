@@ -1,3 +1,4 @@
+using Maliev.InvoiceService.Application.Models.Payments;
 using Maliev.InvoiceService.Application.Services;
 using Maliev.MessagingContracts.Contracts.Payments;
 using MassTransit;
@@ -35,9 +36,19 @@ public partial class PaymentCompletedEventConsumer : IConsumer<PaymentCompletedE
 
         try
         {
-            // PaymentCompletedEvent received - payment allocation should be done
-            // via direct API calls to /allocate endpoint with invoice ID
-            // This consumer serves as a notification/audit trail
+            _ = await _invoiceService.RecordExternalPaymentAsync(
+                payload.PaymentId,
+                new CreatePaymentRequest
+                {
+                    PaymentAmount = (decimal)payload.Amount,
+                    PaymentDate = @event.OccurredAtUtc.UtcDateTime,
+                    PaymentMethod = "Stripe",
+                    ReferenceNumber = payload.OrderNumber,
+                    Notes = $"Order {payload.OrderNumber} ({payload.OrderId}) paid via PaymentService event.",
+                    RecordedBy = "PaymentService"
+                },
+                context.CancellationToken);
+
             Log.PaymentCompletedForOrder(_logger, payload.PaymentId, payload.OrderId, payload.Amount, payload.Currency);
         }
         catch (Exception ex)

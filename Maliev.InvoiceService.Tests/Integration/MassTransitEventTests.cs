@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Application.Models.Payments;
 using Maliev.InvoiceService.Api.Authorization;
+using Maliev.InvoiceService.Domain.Entities;
 using Maliev.InvoiceService.Tests.Fixtures;
 using MassTransit;
 using MassTransit.Testing;
@@ -515,12 +516,14 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     }
 
     [Fact]
-    public async Task PaymentCompletedEventConsumer_ShouldLogPaymentNotification()
+    public async Task PaymentCompletedEventConsumer_ShouldRecordPaymentIdempotently()
     {
         // Arrange
         await _factory.CleanDatabaseAsync();
         var orderId = Guid.NewGuid();
         var paymentId = Guid.NewGuid();
+        var orderNumber = "ORD-12345";
+        var paidAmount = 1500.00m;
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -541,25 +544,32 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                 IsPublic: false,
                 Payload: new PaymentCompletedEventPayload(
                     OrderId: orderId,
-                    OrderNumber: "ORD-12345",
+                    OrderNumber: orderNumber,
                     CustomerId: Guid.NewGuid().ToString(),
                     PaymentId: paymentId,
-                    Amount: 1500.00,
+                    Amount: (double)paidAmount,
                     Currency: "THB"
                 )
             );
 
             await harness.Bus.Publish(paymentEvent);
+            await harness.Bus.Publish(paymentEvent);
 
-            // Wait for consumer to process
-            Assert.True(await harness.Consumed.Any<PaymentCompletedEvent>(),
-                "PaymentCompletedEvent should be consumed");
+            var payment = await WaitForPaymentAsync(paymentId);
 
-            // Give time for async processing
-            await Task.Delay(500);
+            Assert.False(await harness.Published.Any<Fault<PaymentCompletedEvent>>(),
+                "Duplicate PaymentCompletedEvent deliveries should not fault the consumer");
 
-            // Assert - Consumer should process without error (logs payment notification)
-            // Since this consumer only logs, we just verify it was consumed successfully
+            Assert.NotNull(payment);
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
+            var paymentCount = await db.Payments.AsNoTracking().CountAsync(p => p.Id == paymentId);
+            Assert.Equal(1, paymentCount);
+            Assert.Equal(paidAmount, payment.PaymentAmount);
+            Assert.Equal("Stripe", payment.PaymentMethod);
+            Assert.Equal(orderNumber, payment.ReferenceNumber);
+            Assert.Contains(orderId.ToString(), payment.Notes);
+            Assert.Equal("PaymentService", payment.RecordedBy);
         }
         finally
         {
@@ -632,5 +642,25 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         {
             await harness.Stop();
         }
+    }
+
+    private async Task<Payment?> WaitForPaymentAsync(Guid paymentId)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
+            var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.Id == paymentId);
+            if (payment != null)
+            {
+                return payment;
+            }
+
+            await Task.Delay(100);
+        }
+
+        return null;
     }
 }
