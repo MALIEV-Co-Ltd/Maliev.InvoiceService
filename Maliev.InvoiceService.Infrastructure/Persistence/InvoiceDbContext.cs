@@ -1,6 +1,7 @@
 using Maliev.Aspire.ServiceDefaults.Database;
 using Maliev.InvoiceService.Infrastructure.Persistence.Configurations;
 using Maliev.InvoiceService.Domain.Entities;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.InvoiceService.Infrastructure.Persistence;
@@ -54,6 +55,10 @@ public class InvoiceDbContext : DbContext
         modelBuilder.ApplyConfiguration(new BillingNoteConfiguration());
         modelBuilder.ApplyConfiguration(new BillingNoteInvoiceConfiguration());
         modelBuilder.ApplyConfiguration(new CreditTermConfiguration());
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
 
         // Apply PostgreSQL snake_case naming convention globally
         SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);

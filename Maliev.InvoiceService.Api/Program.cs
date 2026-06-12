@@ -8,6 +8,7 @@ using Maliev.InvoiceService.Infrastructure.Services;
 using Maliev.InvoiceService.Infrastructure.BackgroundServices;
 using Maliev.InvoiceService.Infrastructure.HttpClients;
 using Maliev.InvoiceService.Api.Services;
+using MassTransit;
 
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
@@ -46,6 +47,12 @@ try
     builder.AddStandardCache("invoice:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
     builder.AddMassTransitWithRabbitMq(x =>
     {
+        x.AddEntityFrameworkOutbox<InvoiceDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.UseBusOutbox();
+        });
+
         x.AddConsumer<FileDeletedEventConsumer>();
         x.AddConsumer<PaymentCompletedEventConsumer>();
         x.AddConsumer<OrderPaidEventConsumer>();
