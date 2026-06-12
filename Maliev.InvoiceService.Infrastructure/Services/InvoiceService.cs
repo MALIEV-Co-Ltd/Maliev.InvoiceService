@@ -1394,6 +1394,7 @@ public class InvoiceService : IInvoiceService
         if (existing != null)
         {
             _logger.LogInformation("External payment {PaymentId} already recorded; returning existing row", paymentId);
+            await AllocateRecordedPaymentByReferenceAsync(existing, request.RecordedBy, cancellationToken);
             return MapPaymentToResponse(existing);
         }
 
@@ -1431,7 +1432,89 @@ public class InvoiceService : IInvoiceService
 
         _logger.LogInformation("Recorded external payment {PaymentId} for amount {Amount}", payment.Id, payment.PaymentAmount);
 
+        await AllocateRecordedPaymentByReferenceAsync(payment, request.RecordedBy, cancellationToken);
+
         return MapPaymentToResponse(payment);
+    }
+
+    private async Task AllocateRecordedPaymentByReferenceAsync(
+        Payment payment,
+        string allocatedBy,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(payment.ReferenceNumber))
+        {
+            return;
+        }
+
+        var alreadyAllocated = await _context.InvoicePaymentAllocations
+            .AsNoTracking()
+            .AnyAsync(
+                allocation =>
+                    allocation.PaymentId == payment.Id &&
+                    allocation.AllocationStatus == "Confirmed",
+                cancellationToken);
+
+        if (alreadyAllocated)
+        {
+            _logger.LogInformation(
+                "External payment {PaymentId} is already allocated; skipping automatic invoice allocation",
+                payment.Id);
+            return;
+        }
+
+        var candidateInvoices = await _context.Invoices
+            .Include(invoice => invoice.InvoicePaymentAllocations)
+            .Where(invoice =>
+                invoice.PoNumber == payment.ReferenceNumber &&
+                !invoice.IsDeleted &&
+                invoice.Status != "Draft" &&
+                invoice.Status != "Cancelled" &&
+                invoice.Status != "Split")
+            .OrderBy(invoice => invoice.IssueDate)
+            .ThenBy(invoice => invoice.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        if (candidateInvoices.Count == 0)
+        {
+            _logger.LogInformation(
+                "No finalized invoice matched external payment reference {ReferenceNumber} for payment {PaymentId}",
+                payment.ReferenceNumber,
+                payment.Id);
+            return;
+        }
+
+        var remainingPaymentAmount = payment.PaymentAmount;
+        foreach (var invoice in candidateInvoices)
+        {
+            if (remainingPaymentAmount <= 0)
+            {
+                break;
+            }
+
+            var confirmedAllocated = invoice.InvoicePaymentAllocations
+                .Where(allocation => allocation.AllocationStatus == "Confirmed")
+                .Sum(allocation => allocation.AllocatedAmount);
+            var outstandingBalance = invoice.GrandTotal - confirmedAllocated;
+
+            if (outstandingBalance <= 0)
+            {
+                continue;
+            }
+
+            var amountToAllocate = Math.Min(remainingPaymentAmount, outstandingBalance);
+            await AllocatePaymentAsync(invoice.Id, payment.Id, amountToAllocate, allocatedBy, cancellationToken);
+            remainingPaymentAmount -= amountToAllocate;
+        }
+
+        if (remainingPaymentAmount > 0)
+        {
+            _logger.LogWarning(
+                "External payment {PaymentId} for reference {ReferenceNumber} has unallocated remainder {RemainingAmount}",
+                payment.Id,
+                payment.ReferenceNumber,
+                remainingPaymentAmount);
+        }
     }
 
     /// <inheritdoc/>
@@ -1523,7 +1606,7 @@ public class InvoiceService : IInvoiceService
             MessageType: MessageType.Event,
             MessageVersion: "1.0.0",
             PublishedBy: "InvoiceService",
-            ConsumedBy: new List<string> { "NotificationService", "AnalyticsService" },
+            ConsumedBy: new List<string> { "ReceiptService", "NotificationService", "AnalyticsService" },
             CorrelationId: Guid.NewGuid(),
             CausationId: null,
             OccurredAtUtc: DateTimeOffset.UtcNow,

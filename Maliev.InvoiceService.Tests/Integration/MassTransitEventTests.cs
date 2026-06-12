@@ -524,6 +524,35 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         var paymentId = Guid.NewGuid();
         var orderNumber = "ORD-12345";
         var paidAmount = 1500.00m;
+        var createRequest = new CreateInvoiceRequest
+        {
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "Paid Customer",
+            CustomerTaxId = "1234567890123",
+            BillingAddress = "123 Payment Road",
+            Currency = "THB",
+            DueDate = DateTime.UtcNow.AddDays(30),
+            PoNumber = orderNumber,
+            Lines =
+            [
+                new InvoiceLineItemRequest
+                {
+                    LineNumber = 1,
+                    Description = "Paid order line",
+                    Quantity = 1,
+                    UnitPrice = 1500.00m,
+                    TaxRate = 0
+                }
+            ]
+        };
+
+        var createResponse = await _client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
+        createResponse.EnsureSuccessStatusCode();
+        var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
+        Assert.NotNull(invoice);
+
+        var finalizeResponse = await _client.PostAsync($"/invoice/v1/invoices/{invoice.Id}/finalize", null);
+        finalizeResponse.EnsureSuccessStatusCode();
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -573,6 +602,22 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.Equal(orderNumber, payment.ReferenceNumber);
             Assert.Contains(orderId.ToString(), payment.Notes);
             Assert.Equal("PaymentService", payment.RecordedBy);
+
+            var allocation = await db.InvoicePaymentAllocations
+                .AsNoTracking()
+                .SingleOrDefaultAsync(a => a.InvoiceId == invoice.Id && a.PaymentId == paymentId);
+            Assert.NotNull(allocation);
+            Assert.Equal(paidAmount, allocation.AllocatedAmount);
+
+            var paidInvoice = await db.Invoices
+                .AsNoTracking()
+                .SingleAsync(i => i.Id == invoice.Id);
+            Assert.Equal("FullyPaid", paidInvoice.Status);
+
+            Assert.True(await harness.Published.Any<InvoicePaymentReceivedEvent>(published =>
+                published.Context.Message.Payload.InvoiceId == invoice.Id &&
+                published.Context.Message.Payload.PaymentId == paymentId &&
+                published.Context.Message.Payload.AllocatedAmount == (double)paidAmount));
         }
         finally
         {
