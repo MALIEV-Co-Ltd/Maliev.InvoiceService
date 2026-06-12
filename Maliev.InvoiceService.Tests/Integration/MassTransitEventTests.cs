@@ -615,6 +615,9 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                     Currency: "THB",
                     PaidAt: DateTimeOffset.UtcNow
                 )
+                {
+                    ProviderName = "omise"
+                }
             );
 
             await harness.Bus.Publish(orderPaidEvent);
@@ -636,7 +639,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.NotNull(payment);
             Assert.Equal(1, paymentCount);
             Assert.Equal(paidAmount, payment.PaymentAmount);
-            Assert.Equal("Stripe", payment.PaymentMethod);
+            Assert.Equal("omise", payment.PaymentMethod);
             Assert.Equal(orderNumber, payment.ReferenceNumber);
             Assert.Contains(orderId.ToString(), payment.Notes);
             Assert.Equal("OrderService", payment.RecordedBy);
