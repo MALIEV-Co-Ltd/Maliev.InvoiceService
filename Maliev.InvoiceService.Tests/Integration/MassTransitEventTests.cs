@@ -550,6 +550,9 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                     Amount: (double)paidAmount,
                     Currency: "THB"
                 )
+                {
+                    ProviderName = "omise"
+                }
             );
 
             await harness.Bus.Publish(paymentEvent);
@@ -566,7 +569,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             var paymentCount = await db.Payments.AsNoTracking().CountAsync(p => p.Id == paymentId);
             Assert.Equal(1, paymentCount);
             Assert.Equal(paidAmount, payment.PaymentAmount);
-            Assert.Equal("Stripe", payment.PaymentMethod);
+            Assert.Equal("omise", payment.PaymentMethod);
             Assert.Equal(orderNumber, payment.ReferenceNumber);
             Assert.Contains(orderId.ToString(), payment.Notes);
             Assert.Equal("PaymentService", payment.RecordedBy);

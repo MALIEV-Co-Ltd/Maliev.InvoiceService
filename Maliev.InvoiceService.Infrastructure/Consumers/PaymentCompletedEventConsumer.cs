@@ -42,7 +42,9 @@ public partial class PaymentCompletedEventConsumer : IConsumer<PaymentCompletedE
                 {
                     PaymentAmount = (decimal)payload.Amount,
                     PaymentDate = @event.OccurredAtUtc.UtcDateTime,
-                    PaymentMethod = "Stripe",
+                    PaymentMethod = string.IsNullOrWhiteSpace(payload.ProviderName)
+                        ? "PaymentService"
+                        : payload.ProviderName,
                     ReferenceNumber = payload.OrderNumber,
                     Notes = $"Order {payload.OrderNumber} ({payload.OrderId}) paid via PaymentService event.",
                     RecordedBy = "PaymentService"
