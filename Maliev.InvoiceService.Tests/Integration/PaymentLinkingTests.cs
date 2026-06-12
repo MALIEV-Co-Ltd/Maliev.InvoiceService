@@ -1,6 +1,9 @@
 using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Application.Models.Payments;
+using Maliev.InvoiceService.Infrastructure.Persistence;
 using Maliev.InvoiceService.Tests.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -91,6 +94,43 @@ public class PaymentLinkingTests : BaseIntegrationTest
         Assert.Equal("FullyPaid", updatedInvoice!.Status);
         Assert.Equal(1070m, updatedInvoice.PaidAmount);
         Assert.Equal(0m, updatedInvoice.OutstandingBalance);
+    }
+
+    [Fact]
+    public async Task LinkPayment_PersistsPaymentLinkedAuditLog()
+    {
+        // Arrange - Clean database for test isolation
+        await CleanDatabaseAsync();
+
+        var invoiceId = await CreateAndFinalizeInvoiceAsync(grandTotal: 1070m);
+        var paymentResponse = await Client.PostAsJsonAsync("/invoice/v1/payments", new CreatePaymentRequest
+        {
+            PaymentAmount = 1070m,
+            PaymentDate = DateTime.UtcNow,
+            PaymentMethod = "Bank Transfer",
+            RecordedBy = "cashier"
+        });
+        var payment = await paymentResponse.Content.ReadFromJsonAsync<PaymentResponse>();
+
+        // Act
+        var linkResponse = await Client.PostAsJsonAsync($"/invoice/v1/payments/invoices/{invoiceId}/link", new LinkPaymentRequest
+        {
+            PaymentId = payment!.Id,
+            AllocatedAmount = 1070m
+        });
+
+        // Assert
+        linkResponse.EnsureSuccessStatusCode();
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
+        var auditLog = await context.AuditLogs
+            .AsNoTracking()
+            .SingleOrDefaultAsync(log => log.InvoiceId == invoiceId && log.EventType == "PaymentLinked");
+
+        Assert.NotNull(auditLog);
+        Assert.Equal("api", auditLog.ActorId);
+        Assert.Contains(payment.Id.ToString(), auditLog.ChangedFields, StringComparison.Ordinal);
     }
 
     [Fact]

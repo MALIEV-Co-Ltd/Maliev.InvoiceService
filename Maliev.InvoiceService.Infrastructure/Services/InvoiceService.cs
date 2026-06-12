@@ -1511,12 +1511,6 @@ public class InvoiceService : IInvoiceService
 
         invoice.UpdatedAt = DateTime.UtcNow;
 
-        // Save changes
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Cache invalidation (T178)
-        await _cache.RemoveAsync($"invoice:{invoiceId}", cancellationToken);
-
         _logger.LogInformation(
             "Allocated payment to invoice: PaymentId={PaymentId}, InvoiceId={InvoiceId}, Amount={Amount}, NewStatus={Status}, OutstandingBalance={OutstandingBalance}",
             paymentId, invoiceId, allocatedAmount, invoice.Status, newOutstandingBalance);
@@ -1623,6 +1617,11 @@ public class InvoiceService : IInvoiceService
         await _publishEndpoint.Publish(
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Cache invalidation (T178)
+        await _cache.RemoveAsync($"invoice:{invoiceId}", cancellationToken);
     }
 
     /// <inheritdoc/>
