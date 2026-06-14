@@ -189,11 +189,18 @@ public class InvoicesController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<InvoiceResponse>> FinalizeInvoice(
         Guid id,
-        [FromBody] FinalizeInvoiceRequest request,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] FinalizeInvoiceRequest? request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("[{CorrelationId}] Finalizing invoice {InvoiceId} by {User}", CorrelationId, id, request.FinalizedBy);
+        var finalizedBy = !string.IsNullOrWhiteSpace(request?.FinalizedBy)
+            ? request.FinalizedBy
+            : User.FindFirst("user_id")?.Value
+                ?? User.FindFirst("sub")?.Value
+                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? "system";
+
+        _logger.LogInformation("[{CorrelationId}] Finalizing invoice {InvoiceId} by {User}", CorrelationId, id, finalizedBy);
 
         try
         {
@@ -201,7 +208,7 @@ public class InvoicesController : ControllerBase
             if (accessDecision == InvoiceAccessDecision.NotFound) return NotFound();
             if (accessDecision == InvoiceAccessDecision.Forbidden) return Forbid();
 
-            var invoice = await _invoiceService.FinalizeInvoiceAsync(id, request.FinalizedBy, idempotencyKey, cancellationToken);
+            var invoice = await _invoiceService.FinalizeInvoiceAsync(id, finalizedBy, idempotencyKey, cancellationToken);
 
             _logger.LogInformation("[{CorrelationId}] Finalized invoice {InvoiceId} with number {InvoiceNumber}",
                 CorrelationId, invoice.Id, invoice.InvoiceNumber);
@@ -256,7 +263,7 @@ public class InvoicesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error cancelling invoice {InvoiceId}", id);
-            return StatusCode(500, new { message = "Error cancelling invoice", details = ex.Message });
+            return StatusCode(500, new { message = "Error cancelling invoice" });
         }
     }
 
@@ -296,7 +303,7 @@ public class InvoicesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating invoice {InvoiceId}", id);
-            return StatusCode(500, new { message = "Error updating invoice", details = ex.Message });
+            return StatusCode(500, new { message = "Error updating invoice" });
         }
     }
 
@@ -335,7 +342,7 @@ public class InvoicesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting invoice {InvoiceId}", id);
-            return StatusCode(500, new { message = "Error deleting invoice", details = ex.Message });
+            return StatusCode(500, new { message = "Error deleting invoice" });
         }
     }
 
@@ -557,7 +564,7 @@ public class InvoicesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering PDF file reference for invoice {InvoiceId}", id);
-            return StatusCode(500, new { message = "Error registering PDF file reference", details = ex.Message });
+            return StatusCode(500, new { message = "Error registering PDF file reference" });
         }
     }
 }
