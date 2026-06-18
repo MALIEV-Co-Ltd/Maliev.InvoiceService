@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Diagnostics.CodeAnalysis;
+using Maliev.InvoiceService.Infrastructure.Consumers;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -197,6 +198,12 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
             // Explicitly configure in-memory to override RabbitMQ from AddMassTransitWithRabbitMq
             services.AddMassTransitTestHarness(cfg =>
             {
+                cfg.AddConsumer<FileDeletedEventConsumer>();
+                cfg.AddConsumer<PaymentCompletedEventConsumer>();
+                cfg.AddConsumer<OrderPaidEventConsumer>();
+                cfg.AddConsumer<PdfGenerationCompletedEventConsumer>();
+                cfg.AddConsumer<SearchReindexRequestedConsumer>();
+
                 cfg.UsingInMemory((context, configurator) =>
                 {
                     configurator.ConfigureEndpoints(context);

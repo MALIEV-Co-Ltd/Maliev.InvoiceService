@@ -450,11 +450,18 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         };
 
         HttpResponseMessage createResponse = await _client.PostAsJsonAsync("/invoice/v1/invoices", createRequest);
+        createResponse.EnsureSuccessStatusCode();
         var createdInvoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
         Assert.NotNull(createdInvoice);
 
         // Finalize the invoice
-        await _client.PostAsJsonAsync($"/invoice/v1/invoices/{createdInvoice.Id}/finalize", new { FinalizedBy = "test-admin" });
+        var finalizeResponse = await _client.PostAsJsonAsync(
+            $"/invoice/v1/invoices/{createdInvoice.Id}/finalize",
+            new FinalizeInvoiceRequest { FinalizedBy = "test-admin" });
+        finalizeResponse.EnsureSuccessStatusCode();
+        var finalizedInvoice = await finalizeResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
+        Assert.NotNull(finalizedInvoice);
+        Assert.Equal("Finalized", finalizedInvoice.Status);
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
         await harness.Start();
@@ -486,6 +493,8 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             await harness.Bus.Publish(pdfEvent);
 
             // Wait for consumer to process
+            Assert.False(await harness.Published.Any<Fault<PdfGenerationCompletedEvent>>(),
+                "PdfGenerationCompletedEvent should not fault");
             Assert.True(await harness.Consumed.Any<PdfGenerationCompletedEvent>(),
                 "PdfGenerationCompletedEvent should be consumed");
 
