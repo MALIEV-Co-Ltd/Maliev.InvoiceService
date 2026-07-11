@@ -4,6 +4,9 @@
 **/out/
 **/.vs/
 **/.vscode/
+.ci-sources/
+.nuget-packages/
+temp/
 
 # Test results
 **/TestResults/
@@ -13,6 +16,8 @@
 **/*.nupkg
 **/*.snupkg
 **/packages/
+!.ci-packages/*.nupkg
+!.ci-packages/SHA256SUMS
 
 # IDE and editor files
 **/.idea/
