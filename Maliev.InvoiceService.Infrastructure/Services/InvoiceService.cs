@@ -1503,8 +1503,14 @@ public class InvoiceService : IInvoiceService
             }
 
             var amountToAllocate = Math.Min(remainingPaymentAmount, outstandingBalance);
-            await AllocatePaymentAsync(invoice.Id, payment.Id, amountToAllocate, allocatedBy, cancellationToken);
-            remainingPaymentAmount -= amountToAllocate;
+            var allocatedAmount = await AllocatePaymentSerializedAsync(
+                invoice.Id,
+                payment.Id,
+                amountToAllocate,
+                allocatedBy,
+                capToOutstandingBalance: true,
+                cancellationToken);
+            remainingPaymentAmount -= allocatedAmount;
         }
 
         if (remainingPaymentAmount > 0)
@@ -1539,6 +1545,73 @@ public class InvoiceService : IInvoiceService
     /// <inheritdoc/>
     public async Task AllocatePaymentAsync(Guid invoiceId, Guid paymentId, decimal allocatedAmount, string allocatedBy, CancellationToken cancellationToken = default)
     {
+        _ = await AllocatePaymentSerializedAsync(
+            invoiceId,
+            paymentId,
+            allocatedAmount,
+            allocatedBy,
+            capToOutstandingBalance: false,
+            cancellationToken);
+    }
+
+    private async Task<decimal> AllocatePaymentSerializedAsync(
+        Guid invoiceId,
+        Guid paymentId,
+        decimal allocatedAmount,
+        string allocatedBy,
+        bool capToOutstandingBalance,
+        CancellationToken cancellationToken)
+    {
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+
+        return await executionStrategy.ExecuteAsync(async () =>
+        {
+            // Payment events can be delivered concurrently on different pods. Acquire an
+            // invoice-scoped transaction lock before reading allocation state so duplicate and
+            // distinct payments cannot publish effects from the same stale outstanding balance.
+            _context.ChangeTracker.Clear();
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+            var invoiceKey = invoiceId.ToByteArray();
+            var invoiceLockKeyHigh = BitConverter.ToInt32(invoiceKey, 0);
+            var invoiceLockKeyLow = BitConverter.ToInt32(invoiceKey, sizeof(int));
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock({invoiceLockKeyHigh}, {invoiceLockKeyLow})",
+                cancellationToken);
+
+            try
+            {
+                var appliedAmount = await AllocatePaymentCoreAsync(
+                    invoiceId,
+                    paymentId,
+                    allocatedAmount,
+                    allocatedBy,
+                    capToOutstandingBalance,
+                    cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return appliedAmount;
+            }
+            catch (DbUpdateException ex) when (IsDuplicatePaymentAllocation(ex))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                _context.ChangeTracker.Clear();
+                _logger.LogInformation(
+                    "Payment {PaymentId} was already allocated to invoice {InvoiceId} concurrently; skipping duplicate transaction",
+                    paymentId,
+                    invoiceId);
+                return 0m;
+            }
+        });
+    }
+
+    private async Task<decimal> AllocatePaymentCoreAsync(
+        Guid invoiceId,
+        Guid paymentId,
+        decimal allocatedAmount,
+        string allocatedBy,
+        bool capToOutstandingBalance,
+        CancellationToken cancellationToken)
+    {
         // Validate invoice exists and is finalized
         var invoice = await _context.Invoices
             .Include(i => i.InvoicePaymentAllocations)
@@ -1554,14 +1627,30 @@ public class InvoiceService : IInvoiceService
         if (invoice.InvoicePaymentAllocations.Any(ipa => ipa.PaymentId == paymentId))
         {
             _logger.LogWarning("Payment {PaymentId} already allocated to invoice {InvoiceId}. Skipping duplicate.", paymentId, invoiceId);
-            return; // Idempotency: Skip duplicate allocation
+            return 0m; // Idempotency: Skip duplicate allocation
         }
 
         // Validate allocated amount doesn't exceed outstanding balance
         var outstandingBalance = await CalculateOutstandingBalanceAsync(invoiceId, cancellationToken);
         if (allocatedAmount > outstandingBalance)
         {
-            throw new InvalidOperationException($"Allocated amount {allocatedAmount} exceeds outstanding balance {outstandingBalance}");
+            if (!capToOutstandingBalance)
+            {
+                throw new InvalidOperationException($"Allocated amount {allocatedAmount} exceeds outstanding balance {outstandingBalance}");
+            }
+
+            _logger.LogInformation(
+                "Capping automatic allocation for payment {PaymentId} on invoice {InvoiceId} from {RequestedAmount} to outstanding balance {OutstandingBalance}",
+                paymentId,
+                invoiceId,
+                allocatedAmount,
+                outstandingBalance);
+            allocatedAmount = outstandingBalance;
+        }
+
+        if (allocatedAmount <= 0)
+        {
+            return 0m;
         }
 
         // Create allocation record
@@ -1705,7 +1794,15 @@ public class InvoiceService : IInvoiceService
 
         // Cache invalidation (T178)
         await _cache.RemoveAsync($"invoice:{invoiceId}", cancellationToken);
+        return allocatedAmount;
     }
+
+    private static bool IsDuplicatePaymentAllocation(DbUpdateException exception) =>
+        exception.InnerException is Npgsql.PostgresException
+        {
+            SqlState: Npgsql.PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "pk_invoice_payment_allocations"
+        };
 
     /// <inheritdoc/>
     public async Task<decimal> CalculateOutstandingBalanceAsync(Guid invoiceId, CancellationToken cancellationToken = default)

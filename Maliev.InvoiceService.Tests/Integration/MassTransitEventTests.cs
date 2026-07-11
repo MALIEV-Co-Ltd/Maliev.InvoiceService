@@ -4,6 +4,7 @@ using Maliev.InvoiceService.Application.Models.Invoices;
 using Maliev.InvoiceService.Application.Models.Payments;
 using Maliev.InvoiceService.Api.Authorization;
 using Maliev.InvoiceService.Domain.Entities;
+using Maliev.InvoiceService.Infrastructure.Consumers;
 using Maliev.InvoiceService.Tests.Fixtures;
 using MassTransit;
 using MassTransit.Testing;
@@ -24,14 +25,14 @@ namespace Maliev.InvoiceService.Tests.Integration;
 /// Integration tests for MassTransit event publishing and consuming in InvoiceService.
 /// Uses its own TestWebApplicationFactory instance to avoid test interference.
 /// </summary>
-public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, IAsyncLifetime
+public class MassTransitEventTests : IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public MassTransitEventTests(TestWebApplicationFactory factory)
+    public MassTransitEventTests()
     {
-        _factory = factory;
+        _factory = new TestWebApplicationFactory();
         _client = _factory.CreateAuthenticatedClient(
             userId: "test-admin",
             roles: ["Admin"],
@@ -43,7 +44,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     public async Task DisposeAsync()
     {
         _client.Dispose();
-        await Task.CompletedTask;
+        await _factory.DisposeAsync();
     }
 
     [Fact]
@@ -196,6 +197,115 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             Assert.Equal(createdInvoice.Id, @event.Payload.InvoiceId);
             Assert.Equal(paymentId, @event.Payload.PaymentId);
             Assert.Equal(500.00, @event.Payload.AllocatedAmount);
+        }
+        finally
+        {
+            await harness.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task PaymentCompletedEventConsumer_DistinctConcurrentPayments_ShouldNotOverAllocateInvoice()
+    {
+        await _factory.CleanDatabaseAsync();
+        var orderNumber = "ORD-CONCURRENT-ALLOCATIONS";
+        var createResponse = await _client.PostAsJsonAsync("/invoice/v1/invoices", new CreateInvoiceRequest
+        {
+            CustomerId = Guid.NewGuid(),
+            Currency = "THB",
+            DueDate = DateTime.UtcNow.AddDays(30),
+            PoNumber = orderNumber,
+            Lines =
+            [
+                new InvoiceLineItemRequest
+                {
+                    LineNumber = 1,
+                    Description = "Concurrent allocation test item",
+                    Quantity = 1,
+                    UnitPrice = 1000.00m,
+                    TaxRate = 0
+                }
+            ],
+            CustomerName = "Concurrent Allocation Customer",
+            CustomerTaxId = "1234567890123",
+            BillingAddress = "123 Test St"
+        });
+        var invoice = await createResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
+        Assert.NotNull(invoice);
+
+        using var finalizeResponse = await _client.PostAsJsonAsync(
+            $"/invoice/v1/invoices/{invoice.Id}/finalize",
+            new FinalizeInvoiceRequest { FinalizedBy = "test-admin" });
+        finalizeResponse.EnsureSuccessStatusCode();
+
+        var firstPaymentId = Guid.NewGuid();
+        var secondPaymentId = Guid.NewGuid();
+        var harness = _factory.Services.GetRequiredService<ITestHarness>();
+        var consumerHarness = harness.GetConsumerHarness<PaymentCompletedEventConsumer>();
+        await harness.Start();
+
+        try
+        {
+            PaymentCompletedEvent CreatePaymentEvent(Guid paymentId) => new(
+                MessageId: Guid.NewGuid(),
+                MessageName: nameof(PaymentCompletedEvent),
+                MessageType: MessageType.Event,
+                MessageVersion: "1.0.0",
+                PublishedBy: "PaymentService",
+                ConsumedBy: ["InvoiceService", "OrderService"],
+                CorrelationId: Guid.NewGuid(),
+                CausationId: null,
+                OccurredAtUtc: DateTimeOffset.UtcNow,
+                IsPublic: false,
+                Payload: new PaymentCompletedEventPayload(
+                    OrderId: Guid.NewGuid(),
+                    OrderNumber: orderNumber,
+                    CustomerId: Guid.NewGuid().ToString(),
+                    PaymentId: paymentId,
+                    Amount: 700.00,
+                    Currency: "THB")
+                {
+                    ProviderName = "omise"
+                });
+
+            await Task.WhenAll(
+                harness.Bus.Publish(CreatePaymentEvent(firstPaymentId)),
+                harness.Bus.Publish(CreatePaymentEvent(secondPaymentId)));
+
+            Assert.NotNull(await WaitForPaymentAsync(firstPaymentId));
+            Assert.NotNull(await WaitForPaymentAsync(secondPaymentId));
+            Assert.True(await consumerHarness.Consumed.Any<PaymentCompletedEvent>(consumed =>
+                consumed.Context.Message.Payload.PaymentId == firstPaymentId));
+            Assert.True(await consumerHarness.Consumed.Any<PaymentCompletedEvent>(consumed =>
+                consumed.Context.Message.Payload.PaymentId == secondPaymentId));
+
+            var allocations = await WaitForInvoiceAllocationsAsync(invoice.Id, expectedCount: 2);
+
+            Assert.Equal(2, allocations.Count);
+            Assert.Equal(invoice.GrandTotal, allocations.Sum(allocation => allocation.AllocatedAmount));
+
+            await using var verificationScope = _factory.Services.CreateAsyncScope();
+            var db = verificationScope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
+            var paidInvoice = await db.Invoices.AsNoTracking().SingleAsync(candidate => candidate.Id == invoice.Id);
+            Assert.Equal("FullyPaid", paidInvoice.Status);
+
+            var allocationEffects = harness.Published
+                .Select<InvoicePaymentReceivedEvent>()
+                .Where(published => published.Context.Message.Payload.InvoiceId == invoice.Id)
+                .ToList();
+            Assert.Equal(2, allocationEffects.Count);
+            Assert.Equal(
+                invoice.GrandTotal,
+                allocationEffects.Sum(effect => (decimal)effect.Context.Message.Payload.AllocatedAmount));
+            Assert.Single(allocationEffects, effect => effect.Context.Message.Payload.PaymentId == firstPaymentId);
+            Assert.Single(allocationEffects, effect => effect.Context.Message.Payload.PaymentId == secondPaymentId);
+
+            var fullyPaidEffects = harness.Published
+                .Select<InvoiceFullyPaidEvent>()
+                .Where(published => published.Context.Message.Payload.InvoiceId == invoice.Id)
+                .ToList();
+            Assert.Single(fullyPaidEffects);
+            Assert.Empty(harness.Published.Select<Fault<PaymentCompletedEvent>>());
         }
         finally
         {
@@ -464,6 +574,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         Assert.Equal("Finalized", finalizedInvoice.Status);
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
+        var consumerHarness = harness.GetConsumerHarness<PdfGenerationCompletedEventConsumer>();
         await harness.Start();
 
         try
@@ -492,30 +603,22 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
 
             await harness.Bus.Publish(pdfEvent);
 
-            // Wait for consumer to process
-            Assert.False(await harness.Published.Any<Fault<PdfGenerationCompletedEvent>>(),
-                "PdfGenerationCompletedEvent should not fault");
-            Assert.True(await harness.Consumed.Any<PdfGenerationCompletedEvent>(),
+            // Wait for this specific consumer delivery before inspecting its durable result.
+            Assert.True(await consumerHarness.Consumed.Any<PdfGenerationCompletedEvent>(consumed =>
+                    consumed.Context.Message.Payload.ReferenceId == createdInvoice.Id.ToString()),
                 "PdfGenerationCompletedEvent should be consumed");
 
-            // Give time for async processing and poll for PDF reference
-            InvoiceResponse? updatedInvoice = null;
-            for (int i = 0; i < 10; i++)
-            {
-                await Task.Delay(200);
-                HttpResponseMessage getResponse = await _client.GetAsync($"/invoice/v1/invoices/{createdInvoice.Id}");
-                updatedInvoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
-                if (updatedInvoice?.PdfFileReference != null)
-                    break;
-            }
+            var updatedInvoice = await WaitForInvoicePdfAsync(createdInvoice.Id);
 
             // Assert - Verify invoice has PDF URL
             Assert.NotNull(updatedInvoice);
             Assert.NotNull(updatedInvoice.PdfFileReference);
             Assert.Contains(pdfUrl, updatedInvoice.PdfFileReference);
+            Assert.Empty(harness.Published.Select<Fault<PdfGenerationCompletedEvent>>());
 
             // Verify InvoiceGeneratedEvent was published as a result
-            Assert.True(await harness.Published.Any<InvoiceGeneratedEvent>(),
+            Assert.True(await harness.Published.Any<InvoiceGeneratedEvent>(published =>
+                    published.Context.Message.Payload.InvoiceId == createdInvoice.Id),
                 "InvoiceGeneratedEvent should be published after PDF registration");
         }
         finally
@@ -564,6 +667,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         finalizeResponse.EnsureSuccessStatusCode();
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
+        var consumerHarness = harness.GetConsumerHarness<PaymentCompletedEventConsumer>();
         await harness.Start();
 
         try
@@ -593,13 +697,28 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                 }
             );
 
-            await harness.Bus.Publish(paymentEvent);
-            await harness.Bus.Publish(paymentEvent);
+            await Task.WhenAll(
+                harness.Bus.Publish(paymentEvent),
+                harness.Bus.Publish(paymentEvent));
 
             var payment = await WaitForPaymentAsync(paymentId);
 
-            Assert.False(await harness.Published.Any<Fault<PaymentCompletedEvent>>(),
-                "Duplicate PaymentCompletedEvent deliveries should not fault the consumer");
+            var deliveryDeadline = DateTime.UtcNow.AddSeconds(5);
+            using var deliveryTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+            var consumedDeliveryCount = 0;
+            while (consumedDeliveryCount < 2 && DateTime.UtcNow < deliveryDeadline)
+            {
+                consumedDeliveryCount = consumerHarness.Consumed
+                    .Select<PaymentCompletedEvent>()
+                    .Count(consumed => consumed.Context.Message.Payload.PaymentId == paymentId);
+                if (consumedDeliveryCount < 2)
+                {
+                    _ = await deliveryTimer.WaitForNextTickAsync();
+                }
+            }
+
+            Assert.Equal(2, consumedDeliveryCount);
+            Assert.Empty(harness.Published.Select<Fault<PaymentCompletedEvent>>());
 
             Assert.NotNull(payment);
             await using var scope = _factory.Services.CreateAsyncScope();
@@ -627,6 +746,43 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                 published.Context.Message.Payload.InvoiceId == invoice.Id &&
                 published.Context.Message.Payload.PaymentId == paymentId &&
                 published.Context.Message.Payload.AllocatedAmount == (double)paidAmount));
+
+            var allocationEffects = harness.Published
+                .Select<InvoicePaymentReceivedEvent>()
+                .Where(published =>
+                    published.Context.Message.Payload.InvoiceId == invoice.Id &&
+                    published.Context.Message.Payload.PaymentId == paymentId)
+                .ToList();
+            Assert.Single(allocationEffects);
+
+            var fullyPaidEffects = harness.Published
+                .Select<InvoiceFullyPaidEvent>()
+                .Where(published =>
+                    published.Context.Message.Payload.InvoiceId == invoice.Id &&
+                    published.Context.Message.Payload.LastPaymentId == paymentId)
+                .ToList();
+            Assert.Single(fullyPaidEffects);
+
+            var followUpPaymentId = Guid.NewGuid();
+            var followUpEvent = paymentEvent with
+            {
+                MessageId = Guid.NewGuid(),
+                CorrelationId = Guid.NewGuid(),
+                Payload = paymentEvent.Payload with
+                {
+                    OrderId = Guid.NewGuid(),
+                    OrderNumber = "ORD-FOLLOW-UP",
+                    PaymentId = followUpPaymentId,
+                    Amount = 1
+                }
+            };
+
+            await harness.Bus.Publish(followUpEvent);
+
+            Assert.NotNull(await WaitForPaymentAsync(followUpPaymentId));
+            Assert.True(await consumerHarness.Consumed.Any<PaymentCompletedEvent>(consumed =>
+                consumed.Context.Message.Payload.PaymentId == followUpPaymentId));
+            Assert.Empty(harness.Published.Select<Fault<PaymentCompletedEvent>>());
         }
         finally
         {
@@ -645,6 +801,7 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
         var orderNumber = "ORD-67890";
 
         var harness = _factory.Services.GetRequiredService<ITestHarness>();
+        var consumerHarness = harness.GetConsumerHarness<OrderPaidEventConsumer>();
         await harness.Start();
 
         try
@@ -678,16 +835,15 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
             await harness.Bus.Publish(orderPaidEvent);
 
             // Wait for consumer to process
-            Assert.True(await harness.Consumed.Any<OrderPaidEvent>(),
+            Assert.True(await consumerHarness.Consumed.Any<OrderPaidEvent>(consumed =>
+                    consumed.Context.Message.Payload.PaymentId == paymentId),
                 "OrderPaidEvent should be consumed");
-            // Give time for async processing
-            await Task.Delay(500);
-            Assert.False(await harness.Published.Any<Fault<OrderPaidEvent>>(),
-                "Duplicate OrderPaidEvent deliveries should not fault the consumer");
+
+            var payment = await WaitForPaymentAsync(paymentId);
+            Assert.Empty(harness.Published.Select<Fault<OrderPaidEvent>>());
 
             await using var scope = _factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
-            var payment = await db.Payments.AsNoTracking().SingleOrDefaultAsync(p => p.Id == paymentId);
             var paymentCount = await db.Payments.AsNoTracking().CountAsync(p => p.Id == paymentId);
 
             Assert.NotNull(payment);
@@ -707,8 +863,9 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
     private async Task<Payment?> WaitForPaymentAsync(Guid paymentId)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
 
-        while (DateTime.UtcNow < deadline)
+        while (true)
         {
             await using var scope = _factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
@@ -718,9 +875,58 @@ public class MassTransitEventTests : IClassFixture<TestWebApplicationFactory>, I
                 return payment;
             }
 
-            await Task.Delay(100);
+            if (DateTime.UtcNow >= deadline || !await timer.WaitForNextTickAsync())
+            {
+                return null;
+            }
         }
+    }
 
-        return null;
+    private async Task<InvoiceResponse?> WaitForInvoicePdfAsync(Guid invoiceId)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+
+        while (true)
+        {
+            using var getResponse = await _client.GetAsync($"/invoice/v1/invoices/{invoiceId}");
+            var invoice = await getResponse.Content.ReadFromJsonAsync<InvoiceResponse>();
+            if (!string.IsNullOrWhiteSpace(invoice?.PdfFileReference))
+            {
+                return invoice;
+            }
+
+            if (DateTime.UtcNow >= deadline || !await timer.WaitForNextTickAsync())
+            {
+                return invoice;
+            }
+        }
+    }
+
+    private async Task<List<InvoicePaymentAllocation>> WaitForInvoiceAllocationsAsync(
+        Guid invoiceId,
+        int expectedCount)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+        List<InvoicePaymentAllocation> allocations;
+
+        do
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
+            allocations = await db.InvoicePaymentAllocations
+                .AsNoTracking()
+                .Where(allocation => allocation.InvoiceId == invoiceId)
+                .ToListAsync();
+
+            if (allocations.Count >= expectedCount)
+            {
+                return allocations;
+            }
+        }
+        while (DateTime.UtcNow < deadline && await timer.WaitForNextTickAsync());
+
+        return allocations;
     }
 }
