@@ -2180,7 +2180,7 @@ public class InvoiceService : IInvoiceService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Registered PDF file reference for invoice {InvoiceId}: {PdfFileReference}", invoiceId, pdfFileReference);
+        _logger.LogInformation("Registered PDF file reference for invoice {InvoiceId}", invoiceId);
     }
 
     /// <inheritdoc/>

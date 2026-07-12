@@ -30,7 +30,7 @@ public partial class PdfGenerationCompletedEventConsumer : IConsumer<PdfGenerati
         var @event = context.Message;
         var payload = @event.Payload;
 
-        Log.ConsumingPdfGenerationCompletedEvent(_logger, payload.RequestId, payload.StorageUrl);
+        Log.ConsumingPdfGenerationCompletedEvent(_logger, payload.RequestId);
 
         try
         {
@@ -55,7 +55,7 @@ public partial class PdfGenerationCompletedEventConsumer : IConsumer<PdfGenerati
                 payload.StorageUrl,
                 context.CancellationToken);
 
-            Log.PdfUrlRegisteredToInvoice(_logger, payload.ReferenceId, payload.StorageUrl);
+            Log.PdfUrlRegisteredToInvoice(_logger, payload.ReferenceId);
         }
         catch (Exception ex)
         {
@@ -66,8 +66,8 @@ public partial class PdfGenerationCompletedEventConsumer : IConsumer<PdfGenerati
 
     private static partial class Log
     {
-        [LoggerMessage(Level = LogLevel.Information, Message = "Consuming PdfGenerationCompletedEvent for RequestId: {RequestId}, StorageUrl: {StorageUrl}")]
-        public static partial void ConsumingPdfGenerationCompletedEvent(ILogger logger, string requestId, string storageUrl);
+        [LoggerMessage(Level = LogLevel.Information, Message = "Consuming PdfGenerationCompletedEvent for RequestId: {RequestId}")]
+        public static partial void ConsumingPdfGenerationCompletedEvent(ILogger logger, string requestId);
 
         [LoggerMessage(Level = LogLevel.Information, Message = "Skipping non-invoice document: DocumentType={DocumentType}, ReferenceId={ReferenceId}")]
         public static partial void SkippingNonInvoiceDocument(ILogger logger, string documentType, string referenceId);
@@ -75,8 +75,8 @@ public partial class PdfGenerationCompletedEventConsumer : IConsumer<PdfGenerati
         [LoggerMessage(Level = LogLevel.Warning, Message = "Invalid invoice ID in ReferenceId: {ReferenceId}")]
         public static partial void InvalidInvoiceId(ILogger logger, string referenceId);
 
-        [LoggerMessage(Level = LogLevel.Information, Message = "Registered PDF URL to invoice {InvoiceId}: {StorageUrl}")]
-        public static partial void PdfUrlRegisteredToInvoice(ILogger logger, string invoiceId, string storageUrl);
+        [LoggerMessage(Level = LogLevel.Information, Message = "Registered PDF URL to invoice {InvoiceId}")]
+        public static partial void PdfUrlRegisteredToInvoice(ILogger logger, string invoiceId);
 
         [LoggerMessage(Level = LogLevel.Error, Message = "Error registering PDF URL for RequestId {RequestId}")]
         public static partial void ErrorRegisteringPdfUrl(ILogger logger, Exception ex, string requestId);

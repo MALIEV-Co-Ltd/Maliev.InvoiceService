@@ -543,8 +543,8 @@ public class InvoicesController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("[{CorrelationId}] Registering PDF file reference for invoice {InvoiceId}: {PdfFileReference}",
-                CorrelationId, id, request.PdfFileReference);
+            _logger.LogInformation("[{CorrelationId}] Registering PDF file reference for invoice {InvoiceId}",
+                CorrelationId, id);
 
             await _invoiceService.RegisterPdfFileReferenceAsync(id, request.PdfFileReference, cancellationToken);
 
