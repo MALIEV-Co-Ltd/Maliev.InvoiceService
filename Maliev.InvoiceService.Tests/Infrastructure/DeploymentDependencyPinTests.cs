@@ -99,7 +99,7 @@ public sealed class DeploymentDependencyPinTests
         Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.MessagingContracts", workflow, StringComparison.Ordinal);
         Assert.Contains("ref: 0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7", workflow, StringComparison.Ordinal);
         Assert.Contains("repository: MALIEV-Co-Ltd/Maliev.Aspire", workflow, StringComparison.Ordinal);
-        Assert.Contains("ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc", workflow, StringComparison.Ordinal);
+        Assert.Contains("ref: bfb1b3917d7272f779b78f1ca1c60f676184ed4e", workflow, StringComparison.Ordinal);
         Assert.Contains("persist-credentials: false", workflow, StringComparison.Ordinal);
         Assert.Contains("prepare-invoice-ci-packages.sh", workflow, StringComparison.Ordinal);
         Assert.Contains("github.run_id", workflow, StringComparison.Ordinal);
@@ -148,7 +148,7 @@ public sealed class DeploymentDependencyPinTests
         Assert.Contains("<package pattern=\"Maliev.*\" />", productionNuGetConfig, StringComparison.Ordinal);
 
         Assert.Contains("messaging_commit=\"0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7\"", packageScript, StringComparison.Ordinal);
-        Assert.Contains("aspire_commit=\"7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc\"", packageScript, StringComparison.Ordinal);
+        Assert.Contains("aspire_commit=\"bfb1b3917d7272f779b78f1ca1c60f676184ed4e\"", packageScript, StringComparison.Ordinal);
         Assert.Contains("messaging_version=\"1.0.91-alpha\"", packageScript, StringComparison.Ordinal);
         Assert.Contains("service_defaults_version=\"1.0.82-alpha\"", packageScript, StringComparison.Ordinal);
         Assert.Contains("dotnet restore \"$generator_project\" --configfile \"$ci_nuget_config\"", packageScript, StringComparison.Ordinal);

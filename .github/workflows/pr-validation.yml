@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: MALIEV-Co-Ltd/Maliev.Aspire
-          ref: 7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc
+          ref: bfb1b3917d7272f779b78f1ca1c60f676184ed4e
           path: .ci-sources/Maliev.Aspire
           persist-credentials: false
 
