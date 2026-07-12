@@ -19,15 +19,15 @@ public sealed class SearchReindexRequestedConsumerTests
     [Fact]
     public async Task Consume_WithoutPayload_IsIgnored()
     {
-        var publishEndpoint = new Mock<IPublishEndpoint>();
+        var bus = new Mock<IBus>();
         var consumer = new SearchReindexRequestedConsumer(
             null!,
-            publishEndpoint.Object,
+            bus.Object,
             Mock.Of<ILogger<SearchReindexRequestedConsumer>>());
 
         await consumer.Consume(CreateContext(CreateCommand(null)).Object);
 
-        publishEndpoint.Verify(
+        bus.Verify(
             publisher => publisher.Publish(
                 It.IsAny<object>(),
                 It.IsAny<CancellationToken>()),

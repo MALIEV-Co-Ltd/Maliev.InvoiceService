@@ -1,5 +1,9 @@
 name: CI - Staging
 
+env:
+  ServiceDefaultsVersion: 1.0.82-alpha
+  MessagingContractsVersion: 1.0.91-alpha
+
 on:
   push:
     tags:
@@ -19,16 +23,16 @@ jobs:
           dotnet-version: "10.x"
 
       - name: Restore dependencies
-        run: dotnet restore Maliev.InvoiceService.slnx
+        run: dotnet restore Maliev.InvoiceService.slnx -p:ServiceDefaultsVersion=${{ env.ServiceDefaultsVersion }} -p:MessagingContractsVersion=${{ env.MessagingContractsVersion }}
         env:
           NUGET_USERNAME: ${{ github.actor }}
           NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Build
-        run: dotnet build Maliev.InvoiceService.slnx --no-restore
+        run: dotnet build Maliev.InvoiceService.slnx --configuration Release --no-restore -p:ServiceDefaultsVersion=${{ env.ServiceDefaultsVersion }} -p:MessagingContractsVersion=${{ env.MessagingContractsVersion }}
 
       - name: Test
-        run: dotnet test Maliev.InvoiceService.slnx --no-build --verbosity normal
+        run: dotnet test Maliev.InvoiceService.slnx --configuration Release --no-build --no-restore --verbosity normal -p:ServiceDefaultsVersion=${{ env.ServiceDefaultsVersion }} -p:MessagingContractsVersion=${{ env.MessagingContractsVersion }}
         working-directory: ${{ github.workspace }}
 
       - name: Authenticate to Google Cloud
@@ -50,6 +54,8 @@ jobs:
             docker build \
             --secret id=nuget_username,env=NUGET_USERNAME \
             --secret id=nuget_password,env=NUGET_PASSWORD \
+            --build-arg SERVICE_DEFAULTS_VERSION=${{ env.ServiceDefaultsVersion }} \
+            --build-arg MESSAGING_CONTRACTS_VERSION=${{ env.MessagingContractsVersion }} \
             -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-invoice-service:$RELEASE_VERSION \
             -f Maliev.InvoiceService.Api/Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-invoice-service:$RELEASE_VERSION

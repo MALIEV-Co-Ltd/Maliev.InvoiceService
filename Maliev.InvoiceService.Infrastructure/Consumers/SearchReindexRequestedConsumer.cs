@@ -14,22 +14,22 @@ public class SearchReindexRequestedConsumer : IConsumer<SearchReindexRequestedCo
 {
     private const string SourceService = "InvoiceService";
     private readonly InvoiceDbContext _context;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IBus _bus;
     private readonly ILogger<SearchReindexRequestedConsumer> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SearchReindexRequestedConsumer"/> class.
     /// </summary>
     /// <param name="context">Invoice database context.</param>
-    /// <param name="publishEndpoint">MassTransit publish endpoint.</param>
+    /// <param name="bus">Raw bus used for non-transactional replay publication.</param>
     /// <param name="logger">Logger instance.</param>
     public SearchReindexRequestedConsumer(
         InvoiceDbContext context,
-        IPublishEndpoint publishEndpoint,
+        IBus bus,
         ILogger<SearchReindexRequestedConsumer> logger)
     {
         _context = context;
-        _publishEndpoint = publishEndpoint;
+        _bus = bus;
         _logger = logger;
     }
 
@@ -58,7 +58,10 @@ public class SearchReindexRequestedConsumer : IConsumer<SearchReindexRequestedCo
             .AsAsyncEnumerable()
             .WithCancellation(context.CancellationToken))
         {
-            await _publishEndpoint.Publish(
+            // Reindex replays already-committed state and has no owning database mutation.
+            // Use the raw bus so a service-wide EF bus outbox does not capture and discard
+            // messages when this read-only consumer completes without SaveChanges.
+            await _bus.Publish(
                 InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, occurredAtUtc),
                 context.CancellationToken);
             count++;
