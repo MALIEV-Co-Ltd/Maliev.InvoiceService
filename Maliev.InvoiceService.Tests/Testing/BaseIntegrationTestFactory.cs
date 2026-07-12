@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Diagnostics.CodeAnalysis;
-using Maliev.InvoiceService.Infrastructure.Consumers;
+using Maliev.MessagingContracts.Contracts.Invoices;
+using Maliev.MessagingContracts.Contracts.Search;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -53,6 +54,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
         // Set environment variable EARLY so Program.cs picks it up during WebApplication.CreateBuilder
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing");
+        Environment.SetEnvironmentVariable("MASSTRANSIT_INMEMORY", "true");
     }
 
     public async Task InitializeAsync()
@@ -137,6 +139,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // Static containers are NOT disposed here to allow reuse across tests
         _testRsa.Dispose();
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
+        Environment.SetEnvironmentVariable("MASSTRANSIT_INMEMORY", null);
     }
 
 
@@ -194,19 +197,27 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                 };
             });
 
-            // Add MassTransit test harness for testing message publishing/consuming
-            // Explicitly configure in-memory to override RabbitMQ from AddMassTransitWithRabbitMq
-            services.AddMassTransitTestHarness(cfg =>
+            // Program registers the consumers and the Testing in-memory transport. The harness
+            // replaces MassTransit's scoped bus context provider, so restore the EF bus outbox
+            // explicitly to keep transactional publish behavior faithful to production.
+            services.AddMassTransitTestHarness(configurator =>
             {
-                cfg.AddConsumer<FileDeletedEventConsumer>();
-                cfg.AddConsumer<PaymentCompletedEventConsumer>();
-                cfg.AddConsumer<OrderPaidEventConsumer>();
-                cfg.AddConsumer<PdfGenerationCompletedEventConsumer>();
-                cfg.AddConsumer<SearchReindexRequestedConsumer>();
+                // Bus outbox delivery replays stored destination sends. Test handlers verify the
+                // events reached transport consumers instead of relying on the publish observer.
+                configurator.AddHandler<InvoiceCreatedEvent>((ConsumeContext<InvoiceCreatedEvent> _) => Task.CompletedTask);
+                configurator.AddHandler<InvoiceCancelledEvent>((ConsumeContext<InvoiceCancelledEvent> _) => Task.CompletedTask);
+                configurator.AddHandler<InvoiceGeneratedEvent>((ConsumeContext<InvoiceGeneratedEvent> _) => Task.CompletedTask);
+                configurator.AddHandler<InvoicePaymentReceivedEvent>((ConsumeContext<InvoicePaymentReceivedEvent> _) => Task.CompletedTask);
+                configurator.AddHandler<InvoiceFullyPaidEvent>((ConsumeContext<InvoiceFullyPaidEvent> _) => Task.CompletedTask);
+                configurator.AddHandler<PaymentAllocatedEvent>((ConsumeContext<PaymentAllocatedEvent> _) => Task.CompletedTask);
+                configurator.AddHandler<SearchDocumentUpsertedEvent>((ConsumeContext<SearchDocumentUpsertedEvent> _) => Task.CompletedTask);
 
-                cfg.UsingInMemory((context, configurator) =>
+                configurator.AddEntityFrameworkOutbox<TDbContext>(options =>
                 {
-                    configurator.ConfigureEndpoints(context);
+                    _ = options.UsePostgres();
+                    options.IsolationLevel = System.Data.IsolationLevel.ReadCommitted;
+                    options.QueryDelay = TimeSpan.FromMilliseconds(100);
+                    options.UseBusOutbox();
                 });
             });
 

@@ -50,13 +50,15 @@ try
         x.AddEntityFrameworkOutbox<InvoiceDbContext>(options =>
         {
             _ = options.UsePostgres();
+            options.IsolationLevel = System.Data.IsolationLevel.ReadCommitted;
+            options.QueryDelay = TimeSpan.FromSeconds(1);
             options.UseBusOutbox();
         });
 
         x.AddConsumer<FileDeletedEventConsumer>();
-        x.AddConsumer<PaymentCompletedEventConsumer>();
-        x.AddConsumer<OrderPaidEventConsumer>();
-        x.AddConsumer<PdfGenerationCompletedEventConsumer>();
+        x.AddConsumer<PaymentCompletedEventConsumer>(typeof(PaymentCompletedEventConsumerDefinition));
+        x.AddConsumer<OrderPaidEventConsumer>(typeof(OrderPaidEventConsumerDefinition));
+        x.AddConsumer<PdfGenerationCompletedEventConsumer>(typeof(PdfGenerationCompletedEventConsumerDefinition));
         x.AddConsumer<SearchReindexRequestedConsumer>();
     }); // RabbitMQ message bus (non-blocking startup)
 

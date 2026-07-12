@@ -16,7 +16,9 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using System.Buffers.Binary;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -35,6 +37,9 @@ namespace Maliev.InvoiceService.Infrastructure.Services;
 /// </summary>
 public class InvoiceService : IInvoiceService
 {
+    private const byte PaymentAllocationLockNamespace = 0x50;
+    private const byte InvoiceAllocationLockNamespace = 0x49;
+
     private readonly InvoiceDbContext _context;
     private readonly ILogger<InvoiceService> _logger;
     private readonly IDistributedCache _cache;
@@ -253,17 +258,9 @@ public class InvoiceService : IInvoiceService
         invoice.GrandTotal = subtotal + totalTax - invoice.WithholdingTaxAmount;
 
         _context.Invoices.Add(invoice);
-        await _context.SaveChangesAsync(cancellationToken);
 
-        // Record metrics
-        InvoiceMetrics.RecordInvoiceCreated("Draft");
-
-        // Invalidate cache (in case customer-specific lists are cached)
-        await _cache.RemoveAsync($"invoice:{invoice.Id}", cancellationToken);
-
-        _logger.LogInformation("Created invoice {InvoiceId} for customer {CustomerId}", invoice.Id, invoice.CustomerId);
-
-        // Publish InvoiceCreatedEvent
+        // Stage both events before SaveChanges so the invoice and EF bus-outbox records
+        // commit atomically.
         await _publishEndpoint.Publish(new InvoiceCreatedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(InvoiceCreatedEvent),
@@ -292,22 +289,17 @@ public class InvoiceService : IInvoiceService
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
 
+        await _context.SaveChangesAsync(cancellationToken);
+
+        InvoiceMetrics.RecordInvoiceCreated("Draft");
+        _logger.LogInformation("Created invoice {InvoiceId} for customer {CustomerId}", invoice.Id, invoice.CustomerId);
+
         return MapToResponse(invoice);
     }
 
     /// <inheritdoc/>
     public async Task<InvoiceResponse?> GetInvoiceByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        // Try to get from cache first
-        var cacheKey = $"invoice:{id}";
-        var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
-
-        if (!string.IsNullOrEmpty(cachedData))
-        {
-            _logger.LogDebug("Retrieved invoice {InvoiceId} from cache", id);
-            return JsonSerializer.Deserialize<InvoiceResponse>(cachedData);
-        }
-
         var invoice = await _context.Invoices
             .Include(i => i.Lines)
             .Include(i => i.ChildInvoices) // Include child invoices
@@ -319,26 +311,10 @@ public class InvoiceService : IInvoiceService
         if (invoice == null)
             return null;
 
-        var response = MapToResponse(invoice);
-
-        // Cache finalized invoices for 24 hours (immutable)
-        if (invoice.Status == "Finalized")
-        {
-            var cacheOptions = new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24)
-            };
-
-            await _cache.SetStringAsync(
-                cacheKey,
-                JsonSerializer.Serialize(response),
-                cacheOptions,
-                cancellationToken);
-
-            _logger.LogDebug("Cached finalized invoice {InvoiceId} for 24 hours", id);
-        }
-
-        return response;
+        // A finalized invoice remains mutable: payment allocation, cancellation, and document
+        // registration all change customer-visible state. Read the authoritative row by primary
+        // key instead of serving a potentially stale financial document from a long-lived cache.
+        return MapToResponse(invoice);
     }
 
     /// <inheritdoc/>
@@ -903,31 +879,7 @@ public class InvoiceService : IInvoiceService
         invoice.FinalizedBy = finalizedBy;
         invoice.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Record metrics
-        InvoiceMetrics.RecordInvoiceFinalized();
-
-        // Record invoice amount in THB
-        var amountInThb = invoice.Currency == "THB"
-            ? invoice.GrandTotal
-            : invoice.GrandTotal * (invoice.ExchangeRate ?? 1m);
-        InvoiceMetrics.RecordInvoiceAmount(amountInThb);
-
-        // Cache the finalized invoice (24 hours)
         var response = MapToResponse(invoice);
-        var cacheKey = $"invoice:{id}";
-        var cacheOptions = new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24)
-        };
-        await _cache.SetStringAsync(
-            cacheKey,
-            JsonSerializer.Serialize(response),
-            cacheOptions,
-            cancellationToken);
-
-        _logger.LogInformation("Finalized invoice {InvoiceId} with invoice number {InvoiceNumber}", invoice.Id, invoice.InvoiceNumber);
 
         // Store idempotency key if provided
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
@@ -944,14 +896,25 @@ public class InvoiceService : IInvoiceService
             };
 
             _context.IdempotencyKeys.Add(idempotencyRecord);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Stored idempotency key {Key} for invoice {InvoiceId}", idempotencyKey, invoice.Id);
         }
 
         await _publishEndpoint.Publish(
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        InvoiceMetrics.RecordInvoiceFinalized();
+        var amountInThb = invoice.Currency == "THB"
+            ? invoice.GrandTotal
+            : invoice.GrandTotal * (invoice.ExchangeRate ?? 1m);
+        InvoiceMetrics.RecordInvoiceAmount(amountInThb);
+
+        _logger.LogInformation("Finalized invoice {InvoiceId} with invoice number {InvoiceNumber}", invoice.Id, invoice.InvoiceNumber);
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            _logger.LogInformation("Stored idempotency key {Key} for invoice {InvoiceId}", idempotencyKey, invoice.Id);
+        }
 
         return response;
     }
@@ -977,11 +940,7 @@ public class InvoiceService : IInvoiceService
         var hadPayments = await _context.InvoicePaymentAllocations
             .AnyAsync(ipa => ipa.InvoiceId == id, cancellationToken);
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Cancelled invoice {InvoiceId}", invoice.Id);
-
-        // Publish InvoiceCancelledEvent
+        // Stage customer and search projections before committing the cancellation.
         Guid.TryParse(cancelledBy, out var cancelledByIdParsed);
         await _publishEndpoint.Publish(new InvoiceCancelledEvent(
             MessageId: Guid.NewGuid(),
@@ -1008,6 +967,10 @@ public class InvoiceService : IInvoiceService
         await _publishEndpoint.Publish(
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Cancelled invoice {InvoiceId}", invoice.Id);
 
         return MapToResponse(invoice);
     }
@@ -1117,20 +1080,15 @@ public class InvoiceService : IInvoiceService
 
         // Add new lines to context
         _context.InvoiceLines.AddRange(newLines);
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Updated invoice {InvoiceId}", invoice.Id);
-
-        // Reload with lines for response
-        invoice = await _context.Invoices
-            .Include(i => i.Lines)
-            .AsNoTracking()
-            .FirstAsync(i => i.Id == id, cancellationToken);
+        invoice.Lines = newLines;
 
         await _publishEndpoint.Publish(
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Updated invoice {InvoiceId}", invoice.Id);
 
         return MapToResponse(invoice);
     }
@@ -1148,13 +1106,13 @@ public class InvoiceService : IInvoiceService
         invoice.IsDeleted = true;
         invoice.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Soft deleted invoice {InvoiceId}", invoice.Id);
-
         await _publishEndpoint.Publish(
             InvoiceSearchDocumentMapper.ToDeletedEvent(invoice.Id, DateTimeOffset.UtcNow),
             cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Soft deleted invoice {InvoiceId}", invoice.Id);
     }
 
     /// <inheritdoc/>
@@ -1302,12 +1260,7 @@ public class InvoiceService : IInvoiceService
             });
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-        await _cache.RemoveAsync($"invoice:{parentInvoice.Id}", cancellationToken);
-
-        _logger.LogInformation("Split invoice {ParentId} into {Count} children by {User}", parentInvoice.Id, childInvoices.Count, splitBy);
-
-        // Publish InvoiceSplitEvent
+        // Stage split and search events before the parent/children/audits are committed.
         var evt = new InvoiceSplitEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(InvoiceSplitEvent),
@@ -1346,6 +1299,10 @@ public class InvoiceService : IInvoiceService
                 InvoiceSearchDocumentMapper.ToUpsertEvent(childInvoice, DateTimeOffset.UtcNow),
                 cancellationToken);
         }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Split invoice {ParentId} into {Count} children by {User}", parentInvoice.Id, childInvoices.Count, splitBy);
 
         return childInvoices.Select(MapToResponse).ToList();
     }
@@ -1388,6 +1345,40 @@ public class InvoiceService : IInvoiceService
     /// <inheritdoc/>
     public async Task<PaymentResponse> RecordExternalPaymentAsync(Guid paymentId, CreatePaymentRequest request, CancellationToken cancellationToken = default)
     {
+        if (_context.Database.CurrentTransaction != null)
+        {
+            return await RecordExternalPaymentWithinTransactionAsync(
+                paymentId,
+                request,
+                cancellationToken);
+        }
+
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        return await executionStrategy.ExecuteAsync(async () =>
+        {
+            _context.ChangeTracker.Clear();
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var response = await RecordExternalPaymentWithinTransactionAsync(
+                paymentId,
+                request,
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return response;
+        });
+    }
+
+    private async Task<PaymentResponse> RecordExternalPaymentWithinTransactionAsync(
+        Guid paymentId,
+        CreatePaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        // Serialize the read/insert before probing for an existing payment so concurrent
+        // deliveries cannot race into the primary-key constraint or allocate the same budget.
+        await AcquireAllocationLockAsync(
+            paymentId,
+            PaymentAllocationLockNamespace,
+            cancellationToken);
+
         var existing = await _context.Payments
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken);
@@ -1411,24 +1402,7 @@ public class InvoiceService : IInvoiceService
         };
 
         _context.Payments.Add(payment);
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException
-        {
-            SqlState: Npgsql.PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "pk_payments"
-        })
-        {
-            _context.Entry(payment).State = EntityState.Detached;
-            var persistedPayment = await _context.Payments
-                .AsNoTracking()
-                .SingleAsync(p => p.Id == paymentId, cancellationToken);
-
-            _logger.LogInformation("External payment {PaymentId} was already recorded concurrently; returning existing row", paymentId);
-            return MapPaymentToResponse(persistedPayment);
-        }
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Recorded external payment {PaymentId} for amount {Amount}", payment.Id, payment.PaymentAmount);
 
@@ -1447,80 +1421,148 @@ public class InvoiceService : IInvoiceService
             return;
         }
 
-        var alreadyAllocated = await _context.InvoicePaymentAllocations
-            .AsNoTracking()
-            .AnyAsync(
-                allocation =>
-                    allocation.PaymentId == payment.Id &&
-                    allocation.AllocationStatus == "Confirmed",
-                cancellationToken);
+        PaymentAllocationTransactionResult result;
+        if (_context.Database.CurrentTransaction != null)
+        {
+            // The EF consumer outbox already owns the transaction and execution strategy. Reuse
+            // it so allocation rows, inbox state, and outgoing events commit as one unit.
+            result = await ApplyRecordedPaymentAllocationAsync(payment, allocatedBy, cancellationToken);
+        }
+        else
+        {
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            result = await executionStrategy.ExecuteAsync(async () =>
+            {
+                _context.ChangeTracker.Clear();
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                var transactionResult = await ApplyRecordedPaymentAllocationAsync(
+                    payment,
+                    allocatedBy,
+                    cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return transactionResult;
+            });
+        }
 
-        if (alreadyAllocated)
+        if (!result.HasMatchingInvoices)
         {
             _logger.LogInformation(
-                "External payment {PaymentId} is already allocated; skipping automatic invoice allocation",
+                "No finalized invoice matched external payment reference {ReferenceNumber} for payment {PaymentId}",
+                result.ReferenceNumber,
                 payment.Id);
             return;
         }
 
+        if (result.RemainingAmount > 0)
+        {
+            _logger.LogWarning(
+                "External payment {PaymentId} for reference {ReferenceNumber} has unallocated remainder {RemainingAmount}",
+                payment.Id,
+                result.ReferenceNumber,
+                result.RemainingAmount);
+        }
+    }
+
+    private async Task<PaymentAllocationTransactionResult> ApplyRecordedPaymentAllocationAsync(
+        Payment payment,
+        string allocatedBy,
+        CancellationToken cancellationToken)
+    {
+        await AcquireAllocationLockAsync(
+            payment.Id,
+            PaymentAllocationLockNamespace,
+            cancellationToken);
+
+        var persistedPayment = await _context.Payments
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == payment.Id, cancellationToken);
+
+        var confirmedPaymentAllocations = await _context.InvoicePaymentAllocations
+            .AsNoTracking()
+            .Where(allocation =>
+                allocation.PaymentId == persistedPayment.Id &&
+                allocation.AllocationStatus == "Confirmed")
+            .Select(allocation => new
+            {
+                allocation.InvoiceId,
+                allocation.AllocatedAmount
+            })
+            .ToListAsync(cancellationToken);
+        var confirmedAllocatedAmount = confirmedPaymentAllocations.Sum(allocation =>
+            allocation.AllocatedAmount);
+        var remainingPaymentAmount = Math.Max(
+            0m,
+            persistedPayment.PaymentAmount - confirmedAllocatedAmount);
+        if (remainingPaymentAmount <= 0)
+        {
+            return PaymentAllocationTransactionResult.AlreadyApplied(persistedPayment.ReferenceNumber);
+        }
+
         var candidateInvoices = await _context.Invoices
-            .Include(invoice => invoice.InvoicePaymentAllocations)
+            .AsNoTracking()
             .Where(invoice =>
-                invoice.PoNumber == payment.ReferenceNumber &&
+                invoice.PoNumber == persistedPayment.ReferenceNumber &&
                 !invoice.IsDeleted &&
                 invoice.Status != "Draft" &&
                 invoice.Status != "Cancelled" &&
                 invoice.Status != "Split")
             .OrderBy(invoice => invoice.IssueDate)
             .ThenBy(invoice => invoice.CreatedAt)
+            .ThenBy(invoice => invoice.Id)
+            .Select(invoice => new
+            {
+                invoice.Id,
+                invoice.IssueDate,
+                invoice.CreatedAt
+            })
             .ToListAsync(cancellationToken);
 
         if (candidateInvoices.Count == 0)
         {
-            _logger.LogInformation(
-                "No finalized invoice matched external payment reference {ReferenceNumber} for payment {PaymentId}",
-                payment.ReferenceNumber,
-                payment.Id);
-            return;
+            return PaymentAllocationTransactionResult.NoMatch(
+                persistedPayment.ReferenceNumber,
+                remainingPaymentAmount);
         }
 
-        var remainingPaymentAmount = payment.PaymentAmount;
-        foreach (var invoice in candidateInvoices)
+        // Lock the immutable ID order first so distinct payments cannot deadlock if business
+        // ordering metadata changes between their candidate snapshots.
+        foreach (var invoiceId in candidateInvoices
+            .Select(candidate => candidate.Id)
+            .OrderBy(id => id))
+        {
+            await AcquireAllocationLockAsync(
+                invoiceId,
+                InvoiceAllocationLockNamespace,
+                cancellationToken);
+        }
+
+        foreach (var candidateInvoice in candidateInvoices)
         {
             if (remainingPaymentAmount <= 0)
             {
                 break;
             }
 
-            var confirmedAllocated = invoice.InvoicePaymentAllocations
-                .Where(allocation => allocation.AllocationStatus == "Confirmed")
-                .Sum(allocation => allocation.AllocatedAmount);
-            var outstandingBalance = invoice.GrandTotal - confirmedAllocated;
-
-            if (outstandingBalance <= 0)
+            var allocatedAmount = await StagePaymentAllocationAsync(
+                candidateInvoice.Id,
+                persistedPayment.Id,
+                remainingPaymentAmount,
+                allocatedBy,
+                capToOutstandingBalance: true,
+                cancellationToken);
+            if (allocatedAmount <= 0)
             {
                 continue;
             }
 
-            var amountToAllocate = Math.Min(remainingPaymentAmount, outstandingBalance);
-            var allocatedAmount = await AllocatePaymentSerializedAsync(
-                invoice.Id,
-                payment.Id,
-                amountToAllocate,
-                allocatedBy,
-                capToOutstandingBalance: true,
-                cancellationToken);
             remainingPaymentAmount -= allocatedAmount;
         }
 
-        if (remainingPaymentAmount > 0)
-        {
-            _logger.LogWarning(
-                "External payment {PaymentId} for reference {ReferenceNumber} has unallocated remainder {RemainingAmount}",
-                payment.Id,
-                payment.ReferenceNumber,
-                remainingPaymentAmount);
-        }
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return PaymentAllocationTransactionResult.Applied(
+            persistedPayment.ReferenceNumber,
+            remainingPaymentAmount);
     }
 
     /// <inheritdoc/>
@@ -1550,7 +1592,6 @@ public class InvoiceService : IInvoiceService
             paymentId,
             allocatedAmount,
             allocatedBy,
-            capToOutstandingBalance: false,
             cancellationToken);
     }
 
@@ -1559,35 +1600,64 @@ public class InvoiceService : IInvoiceService
         Guid paymentId,
         decimal allocatedAmount,
         string allocatedBy,
-        bool capToOutstandingBalance,
         CancellationToken cancellationToken)
     {
         var executionStrategy = _context.Database.CreateExecutionStrategy();
 
         return await executionStrategy.ExecuteAsync(async () =>
         {
-            // Payment events can be delivered concurrently on different pods. Acquire an
-            // invoice-scoped transaction lock before reading allocation state so duplicate and
-            // distinct payments cannot publish effects from the same stale outstanding balance.
+            // Direct allocations use the same payment-then-invoice lock order as event-driven
+            // allocation so the persisted payment amount remains a global monetary invariant.
             _context.ChangeTracker.Clear();
             await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-            var invoiceKey = invoiceId.ToByteArray();
-            var invoiceLockKeyHigh = BitConverter.ToInt32(invoiceKey, 0);
-            var invoiceLockKeyLow = BitConverter.ToInt32(invoiceKey, sizeof(int));
-            await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock({invoiceLockKeyHigh}, {invoiceLockKeyLow})",
+            await AcquireAllocationLockAsync(
+                paymentId,
+                PaymentAllocationLockNamespace,
+                cancellationToken);
+
+            var persistedPayment = await _context.Payments
+                .AsNoTracking()
+                .SingleOrDefaultAsync(candidate => candidate.Id == paymentId, cancellationToken)
+                ?? throw new KeyNotFoundException($"Payment {paymentId} not found");
+            var confirmedPaymentAllocations = await _context.InvoicePaymentAllocations
+                .AsNoTracking()
+                .Where(allocation =>
+                    allocation.PaymentId == paymentId &&
+                    allocation.AllocationStatus == "Confirmed")
+                .Select(allocation => new
+                {
+                    allocation.InvoiceId,
+                    allocation.AllocatedAmount
+                })
+                .ToListAsync(cancellationToken);
+
+            var isIdempotentRetry = confirmedPaymentAllocations.Any(allocation =>
+                allocation.InvoiceId == invoiceId);
+            var remainingPaymentAmount = Math.Max(
+                0m,
+                persistedPayment.PaymentAmount - confirmedPaymentAllocations.Sum(allocation => allocation.AllocatedAmount));
+            if (!isIdempotentRetry && allocatedAmount > remainingPaymentAmount)
+            {
+                throw new InvalidOperationException(
+                    $"Allocated amount {allocatedAmount} exceeds remaining payment amount {remainingPaymentAmount}");
+            }
+
+            await AcquireAllocationLockAsync(
+                invoiceId,
+                InvoiceAllocationLockNamespace,
                 cancellationToken);
 
             try
             {
-                var appliedAmount = await AllocatePaymentCoreAsync(
+                var appliedAmount = await StagePaymentAllocationAsync(
                     invoiceId,
                     paymentId,
                     allocatedAmount,
                     allocatedBy,
-                    capToOutstandingBalance,
+                    capToOutstandingBalance: false,
                     cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return appliedAmount;
             }
@@ -1604,7 +1674,7 @@ public class InvoiceService : IInvoiceService
         });
     }
 
-    private async Task<decimal> AllocatePaymentCoreAsync(
+    private async Task<decimal> StagePaymentAllocationAsync(
         Guid invoiceId,
         Guid paymentId,
         decimal allocatedAmount,
@@ -1630,8 +1700,12 @@ public class InvoiceService : IInvoiceService
             return 0m; // Idempotency: Skip duplicate allocation
         }
 
-        // Validate allocated amount doesn't exceed outstanding balance
-        var outstandingBalance = await CalculateOutstandingBalanceAsync(invoiceId, cancellationToken);
+        // The allocation collection was loaded after the invoice lock. Reuse it so the decision
+        // and mutation are based on one consistent snapshot without a redundant invoice query.
+        var confirmedAllocatedAmount = invoice.InvoicePaymentAllocations
+            .Where(allocation => allocation.AllocationStatus == "Confirmed")
+            .Sum(allocation => allocation.AllocatedAmount);
+        var outstandingBalance = Math.Max(0m, invoice.GrandTotal - confirmedAllocatedAmount);
         if (allocatedAmount > outstandingBalance)
         {
             if (!capToOutstandingBalance)
@@ -1790,11 +1864,48 @@ public class InvoiceService : IInvoiceService
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Cache invalidation (T178)
-        await _cache.RemoveAsync($"invoice:{invoiceId}", cancellationToken);
         return allocatedAmount;
+    }
+
+    private async Task AcquireAllocationLockAsync(
+        Guid resourceId,
+        byte lockNamespace,
+        CancellationToken cancellationToken)
+    {
+        var lockKey = CreateAllocationLockKey(resourceId, lockNamespace);
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({lockKey})",
+            cancellationToken);
+    }
+
+    private static long CreateAllocationLockKey(Guid resourceId, byte lockNamespace)
+    {
+        Span<byte> lockMaterial = stackalloc byte[17];
+        lockMaterial[0] = lockNamespace;
+        _ = resourceId.TryWriteBytes(lockMaterial[1..]);
+
+        Span<byte> hash = stackalloc byte[SHA256.HashSizeInBytes];
+        _ = SHA256.HashData(lockMaterial, hash);
+        return BinaryPrimitives.ReadInt64LittleEndian(hash);
+    }
+
+    private sealed record PaymentAllocationTransactionResult(
+        string? ReferenceNumber,
+        decimal RemainingAmount,
+        bool HasMatchingInvoices)
+    {
+        public static PaymentAllocationTransactionResult AlreadyApplied(string? referenceNumber) =>
+            new(referenceNumber, 0m, HasMatchingInvoices: true);
+
+        public static PaymentAllocationTransactionResult NoMatch(
+            string? referenceNumber,
+            decimal remainingAmount) =>
+            new(referenceNumber, remainingAmount, HasMatchingInvoices: false);
+
+        public static PaymentAllocationTransactionResult Applied(
+            string? referenceNumber,
+            decimal remainingAmount) =>
+            new(referenceNumber, remainingAmount, HasMatchingInvoices: true);
     }
 
     private static bool IsDuplicatePaymentAllocation(DbUpdateException exception) =>
@@ -2026,14 +2137,7 @@ public class InvoiceService : IInvoiceService
         invoice.PdfFileReference = pdfFileReference;
         invoice.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Invalidate cache
-        await _cache.RemoveAsync($"invoice:{invoiceId}", cancellationToken);
-
-        _logger.LogInformation("Registered PDF file reference for invoice {InvoiceId}: {PdfFileReference}", invoiceId, pdfFileReference);
-
-        // Publish InvoiceGeneratedEvent
+        // Stage the generated-document and search events with the invoice/audit update.
         await _publishEndpoint.Publish(new InvoiceGeneratedEvent(
             MessageId: Guid.NewGuid(),
             MessageName: nameof(InvoiceGeneratedEvent),
@@ -2070,11 +2174,13 @@ public class InvoiceService : IInvoiceService
             CreatedAt = DateTime.UtcNow
         }, cancellationToken);
 
-        await _context.SaveChangesAsync(cancellationToken);
-
         await _publishEndpoint.Publish(
             InvoiceSearchDocumentMapper.ToUpsertEvent(invoice, DateTimeOffset.UtcNow),
             cancellationToken);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Registered PDF file reference for invoice {InvoiceId}: {PdfFileReference}", invoiceId, pdfFileReference);
     }
 
     /// <inheritdoc/>
