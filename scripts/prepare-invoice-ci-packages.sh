@@ -7,7 +7,7 @@ readonly output_path="${3:-.ci-packages}"
 readonly messaging_commit="0bcd4c704d842211c5ff9bd6b9c4b3aacfcbd8e7"
 readonly aspire_commit="7121d57705fc1eff6c7ebb6a69e33e9c26ebfccc"
 readonly messaging_version="1.0.91-alpha"
-readonly service_defaults_version="1.0.81-alpha"
+readonly service_defaults_version="1.0.82-alpha"
 readonly ci_nuget_config="$(pwd)/NuGet.PRValidation.Config"
 
 assert_checkout() {

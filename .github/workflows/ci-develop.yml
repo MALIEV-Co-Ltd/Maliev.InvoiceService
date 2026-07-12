@@ -1,7 +1,7 @@
 name: CI - Develop
 
 env:
-  ServiceDefaultsVersion: 1.0.81-alpha
+  ServiceDefaultsVersion: 1.0.82-alpha
   MessagingContractsVersion: 1.0.91-alpha
 
 on:
