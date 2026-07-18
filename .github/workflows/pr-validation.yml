@@ -1,15 +1,16 @@
-name: CI - Release tag validation
+name: PR validation
 
 on:
-  push:
-    tags:
-      - "release/v*"
+  pull_request:
+    branches:
+      - develop
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: invoice-release-validation-${{ github.ref }}
+  group: invoice-pr-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
