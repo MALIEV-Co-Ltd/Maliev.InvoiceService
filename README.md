@@ -99,6 +99,12 @@ To configure your local secrets:
     ```
     **Note:** The `JwtSecurityKey` is currently hardcoded in `Program.cs` for demonstration purposes. **It is crucial to replace this hardcoded key with a secure key loaded from configuration (e.g., User Secrets for local development, environment variables, or Google Secret Manager for production) before deploying to a production environment.**
 
+## Validation and release boundary
+
+Pull requests and pushes to `develop` or `main`, plus `release/v*` tag pushes, run the same read-only restore, dependency-audit, build, and test boundary. The validation workflows use only `contents: read`; they do not receive cloud or GitOps credentials.
+
+No workflow in this repository publishes an image, updates GitOps, or deploys a workload. Image publication and environment promotion remain disabled until the complete system passes Aspire owner review and a separate, explicitly approved release path is introduced. A successful validation status therefore proves source readiness only; it is not release authorization.
+
 ## Deployment
 
 The project is configured for deployment to Kubernetes using Google Kubernetes Engine (GKE).
