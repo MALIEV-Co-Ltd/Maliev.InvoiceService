@@ -247,3 +247,13 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: "1"
+
+  validate:
+    needs:
+      - dependency-packages
+      - build-and-test
+      - container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm all validation gates passed
+        run: echo "All InvoiceService validation gates passed."
