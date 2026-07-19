@@ -1,132 +1,171 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using Maliev.InvoiceService.Data.Data;
+using Maliev.Aspire.ServiceDefaults;
+using Maliev.InvoiceService.Application.Services;
+using Maliev.InvoiceService.Application.Services.External;
+using Maliev.InvoiceService.Infrastructure.Persistence;
+using Maliev.InvoiceService.Infrastructure.Persistence.Interceptors;
+using Maliev.InvoiceService.Infrastructure.Consumers;
+using Maliev.InvoiceService.Infrastructure.Services;
+using Maliev.InvoiceService.Infrastructure.BackgroundServices;
+using Maliev.InvoiceService.Infrastructure.HttpClients;
 using Maliev.InvoiceService.Api.Services;
+using MassTransit;
 
-var builder = WebApplication.CreateBuilder(args);
+// Initialize bootstrap logging
+using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
+var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
-// Load secrets from mounted volume in GKE
-var secretsPath = "/mnt/secrets";
-if (Directory.Exists(secretsPath))
+try
 {
-    builder.Configuration.AddKeyPerFile(directoryPath: secretsPath, optional: true);
-}
+    Maliev.InvoiceService.Api.Program.Log.StartingHost(bootstrapLogger, "Invoice Service");
 
-// Add services to the container.
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(option =>
-{
-    option.SwaggerDoc("v1", new OpenApiInfo { Title = "Invoice Service API", Version = "v1" });
-    option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    var builder = WebApplication.CreateBuilder(args);
+
+    // --- Secrets & Configuration ---
+    builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
+
+    // --- Infrastructure & Observability ---
+    builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+    builder.AddStandardMiddleware(options =>
     {
-        In = ParameterLocation.Header,
-        Description = "Please enter a valid token",
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        BearerFormat = "JWT",
-        Scheme = "Bearer"
+        options.EnableRequestLogging = true;
     });
-    option.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+    builder.AddServiceMeters("invoices-meter"); // Register service meters for OpenTelemetry business metrics
+
+    builder.Services.AddHttpContextAccessor();
+
+    // Database Context with ServiceDefaults + custom interceptors
+    builder.AddPostgresDbContext<InvoiceDbContext>(
+        connectionName: "InvoiceDbContext",
+        configureOptions: (sp, options) =>
         {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type=ReferenceType.SecurityScheme,
-                    Id="Bearer"
-                }
-            },
-            new string[]{}
-        }
-    });
-});
-
-// Configure InvoiceContext DbContext
-if (Environment.GetEnvironmentVariable("TESTING") != "true")
-{
-    builder.Services.AddDbContext<InvoiceContext>(options =>
-    {
-        options.UseSqlServer(builder.Configuration.GetConnectionString("InvoiceServiceDbContext"));
-    });
-}
-
-builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
-// Register Invoice Services
-builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-builder.Services.AddScoped<IInvoiceFileService, InvoiceFileService>();
-builder.Services.AddScoped<IOrderItemService, OrderItemService>();
-
-// Configure CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(
-        policy =>
-        {
-            policy.WithOrigins(
-                "http://*.maliev.com",
-                "https://*.maliev.com")
-            .SetIsOriginAllowedToAllowWildcardSubdomains()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+            options.AddInterceptors(
+                new AuditLogInterceptor(sp.GetService<IHttpContextAccessor>()),
+                new DatabaseMetricsInterceptor()
+            );
         });
-});
 
-// JWT Bearer authentication configuration
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+    builder.AddStandardCache("invoice:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
+    builder.AddMassTransitWithRabbitMq(x =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSecurityKey"]!))
-    };
-});
+        x.AddEntityFrameworkOutbox<InvoiceDbContext>(options =>
+        {
+            _ = options.UsePostgres();
+            options.IsolationLevel = System.Data.IsolationLevel.ReadCommitted;
+            options.QueryDelay = TimeSpan.FromSeconds(1);
+            options.UseBusOutbox();
+        });
 
-builder.Services.AddAuthorization();
+        x.AddConsumer<FileDeletedEventConsumer>();
+        x.AddConsumer<PaymentCompletedEventConsumer>(typeof(PaymentCompletedEventConsumerDefinition));
+        x.AddConsumer<OrderPaidEventConsumer>(typeof(OrderPaidEventConsumerDefinition));
+        x.AddConsumer<PdfGenerationCompletedEventConsumer>(typeof(PdfGenerationCompletedEventConsumerDefinition));
+        x.AddConsumer<SearchReindexRequestedConsumer>();
+    }); // RabbitMQ message bus (non-blocking startup)
 
-var app = builder.Build();
+    // --- API Configuration ---
+    builder.AddStandardCors(); // CORS with fail-fast validation
+    builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
-// Configure the HTTP request pipeline.
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+    // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
+    builder.AddJwtAuthentication();
+
+    // Register permissions/roles on startup
+    builder.AddIAMServiceClient("invoice");
+    builder.Services.AddIAMRegistration<InvoiceIAMRegistrationService>("invoice");
+
+    // Register claims transformation for legacy role mapping
+    builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, Maliev.InvoiceService.Api.Authorization.IAMClaimsTransformation>();
+
+    // Authorization with Permission Policy Provider
+    builder.Services.AddPermissionAuthorization();
+
+    // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
+    if (!builder.Environment.IsProduction())
+    {
+        builder.AddStandardOpenApi(
+            title: "MALIEV Invoice Service API",
+            description: "Invoice lifecycle management service. Handles invoice creation from quotations, draft editing, finalization with sequential numbering, payment recording, invoice splitting for partial billing, cancellation, CSV/JSON export, and audit trail tracking.");
+    }
+
+    builder.Services.AddControllers();
+    builder.Services.AddMemoryCache();
+    // Services
+    builder.Services.AddScoped<Maliev.InvoiceService.Api.Authorization.InvoiceAccessGuard>();
+    builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+    builder.Services.AddScoped<IBillingNoteService, BillingNoteService>();
+
+    // Background Services
+    builder.Services.AddHostedService<AuditArchivalService>();
+
+    // External Service Clients with Polly v8 Resilience
+    builder.AddAuthenticatedServiceClient<ICurrencyServiceClient, CurrencyServiceClient>("CurrencyService", "invoice");
+    builder.AddAuthenticatedServiceClient<IQuotationServiceClient, QuotationServiceClient>("QuotationService", "invoice");
+    builder.AddAuthenticatedServiceClient<IPaymentServiceClient, PaymentServiceClient>("PaymentService", "invoice");
+    builder.AddAuthenticatedServiceClient<ICustomerServiceClient, CustomerServiceClient>("CustomerService", "invoice");
+
+    var app = builder.Build();
+    var logger = app.Services.GetRequiredService<ILogger<Maliev.InvoiceService.Api.Program>>();
+
+    // --- Database Migrations ---
+    await app.MigrateDatabaseAsync<InvoiceDbContext>();
+
+    // --- Middleware Pipeline ---
+    app.UseStandardMiddleware();
+
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
+    app.UseCors();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Map endpoints after middleware
+    app.MapControllers();
+
+    // Map Aspire default endpoints (/health, /alive, /metrics)
+    app.MapDefaultEndpoints(servicePrefix: "invoice");
+
+    // Map OpenAPI and Scalar documentation (dev/staging only)
+    app.MapApiDocumentation(servicePrefix: "invoice");
+
+    Maliev.InvoiceService.Api.Program.Log.ServiceStarted(logger, "Invoice Service");
+    await app.RunAsync();
+}
+catch (Exception ex)
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Invoice Service API V1");
-    c.RoutePrefix = "invoices/swagger";
-});
-
-// Secure Swagger UI
-app.UseWhen(context => context.Request.Path.StartsWithSegments("/invoices/swagger"), appBuilder =>
+    Maliev.InvoiceService.Api.Program.Log.HostTerminated(bootstrapLogger, ex, "Invoice Service");
+    // Force flush to ensure Aspire captures the error before process exits
+    Console.Out.Flush();
+    Console.Error.Flush();
+    throw;
+}
+finally
 {
-    appBuilder.UseAuthorization();
-});
+    loggerFactory.Dispose();
+}
 
-app.UseExceptionHandler("/invoices/error"); // Add ProblemDetails exception handler
-app.UseHttpsRedirection();
+namespace Maliev.InvoiceService.Api
+{
+    /// <summary>
+    /// Main program class for the application
+    /// </summary>
+    public partial class Program
+    {
+        internal static partial class Log
+        {
+            [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+            public static partial void StartingHost(ILogger logger, string serviceName);
 
-app.UseAuthentication();
+            [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+            public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
 
-app.UseAuthorization();
+            [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+            public static partial void ServiceStarted(ILogger logger, string serviceName);
 
-// Liveness probe endpoint
-app.MapGet("/invoices/liveness", () => "Healthy");
-
-// Readiness probe endpoint
-app.MapGet("/invoices/readiness", () => "Healthy");
-
-app.MapControllers();
-
-app.Run();
+            [LoggerMessage(Level = LogLevel.Error, Message = "Database migration failed - application may not function correctly")]
+            public static partial void MigrationFailed(ILogger logger, Exception exception);
+        }
+    }
+}
