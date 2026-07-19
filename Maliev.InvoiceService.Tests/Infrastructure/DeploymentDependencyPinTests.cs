@@ -50,7 +50,7 @@ public sealed class DeploymentDependencyPinTests
 
         foreach (var workflowName in new[]
                  {
-                     "_build-and-test.yml",
+                     "_validate.yml",
                      "ci-develop.yml",
                      "ci-main.yml",
                      "ci-staging.yml",
@@ -70,7 +70,8 @@ public sealed class DeploymentDependencyPinTests
     public void PullRequestValidation_ReconstructsExactPackagesWithoutSecrets()
     {
         var repositoryRoot = FindRepositoryRoot();
-        var workflowPath = Path.Combine(repositoryRoot, ".github", "workflows", "pr-validation.yml");
+        var workflowPath = Path.Combine(repositoryRoot, ".github", "workflows", "_validate.yml");
+        var pullRequestWorkflowPath = Path.Combine(repositoryRoot, ".github", "workflows", "pr-validation.yml");
         var ciNuGetConfigPath = Path.Combine(repositoryRoot, "NuGet.PRValidation.Config");
         var packageScriptPath = Path.Combine(repositoryRoot, "scripts", "prepare-invoice-ci-packages.sh");
 
@@ -78,14 +79,17 @@ public sealed class DeploymentDependencyPinTests
         Assert.True(File.Exists(packageScriptPath), "Expected an exact dependency package reconstruction script.");
 
         var workflow = File.ReadAllText(workflowPath);
+        var pullRequestWorkflow = File.ReadAllText(pullRequestWorkflowPath);
         var ciNuGetConfig = File.ReadAllText(ciNuGetConfigPath);
         var packageScript = File.ReadAllText(packageScriptPath);
         var productionNuGetConfig = File.ReadAllText(Path.Combine(repositoryRoot, "nuget.config"));
 
-        Assert.Contains("pull_request:", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("pull_request_target", workflow, StringComparison.Ordinal);
-        Assert.Contains("permissions:", workflow, StringComparison.Ordinal);
-        Assert.Contains("contents: read", workflow, StringComparison.Ordinal);
+        Assert.Contains("workflow_call:", workflow, StringComparison.Ordinal);
+        Assert.Contains("pull_request:", pullRequestWorkflow, StringComparison.Ordinal);
+        Assert.Contains("uses: ./.github/workflows/_validate.yml", pullRequestWorkflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("pull_request_target", pullRequestWorkflow, StringComparison.Ordinal);
+        Assert.Contains("permissions:", pullRequestWorkflow, StringComparison.Ordinal);
+        Assert.Contains("contents: read", pullRequestWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("packages: read", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("GITOPS_PAT", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("secrets.", workflow, StringComparison.OrdinalIgnoreCase);
