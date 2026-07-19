@@ -128,6 +128,9 @@ public sealed class DeploymentDependencyPinTests
         Assert.Contains("format: cyclonedx", workflow, StringComparison.Ordinal);
         Assert.Contains("severity: HIGH,CRITICAL", workflow, StringComparison.Ordinal);
         Assert.Contains("exit-code: \"1\"", workflow, StringComparison.Ordinal);
+        Assert.Contains("\n  validate:\n", workflow, StringComparison.Ordinal);
+        Assert.Contains("      - dependency-packages\n      - build-and-test\n      - container", workflow, StringComparison.Ordinal);
+        Assert.Contains("Confirm all validation gates passed", workflow, StringComparison.Ordinal);
         Assert.Equal(
             2,
             Regex.Matches(
