@@ -1,185 +1,93 @@
-# MALIEV Microservices Constitution
+# MALIEV Microservices Constitution (v2.0.0)
 
-<!--
-SYNC IMPACT REPORT
-==================
-Version Change: 1.1.0 → 1.2.0 (Amendment: Business Metrics & Analytics Enforcement)
-Ratification Date: 2025-10-02
-Last Amendment: 2025-10-09
-
-NEW PRINCIPLE ADDED:
-- X. Business Metrics & Analytics (NON-NEGOTIABLE)
-
-UPDATES:
-- Deployment & Operations Standards: Metrics collection endpoints required.
-- Development Workflow: Tests must include analytics validation.
-- Governance: Constitution compliance extended to cover business analytics reporting.
-
-TEMPLATE UPDATES REQUIRED:
-✅ spec-template.md — add “Metrics & Analytics Requirements” section  
-✅ plan-template.md — reference Principle X compliance check  
-✅ tasks-template.md — add analytics instrumentation and test task before release  
-✅ monitoring-config.yaml — enforce standard metrics labels (service, version, region)
-
-FOLLOW-UP ITEMS:
-- Centralize analytics ingestion via company telemetry gateway  
-- Define canonical metric taxonomy (revenue, user activity, conversion, uptime, etc.)
--->
-
-## Core Principles
-
-### I. Service Autonomy (NON-NEGOTIABLE)
-
-Each microservice must be **self-contained**:
-
-* Own database and schema
-* Own domain logic
-* Interact with others only via APIs or events
-* No direct database access to another service
-
-**Rationale:** Enables independent deployment, scaling, and ownership.
+This is the foundational law of the MALIEV platform. All services, developers, and agents MUST adhere to these rules.
 
 ---
 
-### II. Explicit Contracts
+## 🏗️ 1. Technical Architecture & Frameworks
 
-* All APIs documented via **OpenAPI/Swagger**
-* Data contracts versioned (MAJOR.MINOR)
-* Backward-compatible migrations mandatory
+### I. Framework Standards
+*   **Target Framework**: All C# services MUST target **.NET 10** (and EF Core 10).
+*   **Infrastructure**: Standard stack includes **PostgreSQL** (via CloudNativePG), **RabbitMQ** (via MassTransit), and **Redis** (caching).
+*   **Optimization**: Codebase must be optimized for **minimal resource usage** (e.g., memory-efficient pooling, trimmed images).
 
-**Rationale:** Prevents breaking changes and preserves consumer stability.
+### II. ServiceDefaults & Aspire
+*   **Shared Infrastructure**: Every service MUST fully utilize `Maliev.Aspire.ServiceDefaults`. Manual configuration of OpenTelemetry, health checks, or resilience is prohibited.
+*   **Local Orchestration**: Services must be integrated into the `Maliev.Aspire` project for local development.
 
----
-
-### III. Test-First Development (NON-NEGOTIABLE)
-
-* Tests authored **immediately after specification approval**, before implementation
-* Code must **fail tests first** (Red–Green–Refactor)
-* Unit, integration, and contract tests mandatory
-* Minimum 80 % coverage for business-critical logic
-* Test code reviewed equally with production code
-
-**Rationale:** Ensures correctness before coding and keeps system behavior verifiable.
+### III. Solutions & Projects
+*   **Solution Format**: Prefer **.slnx** over the traditional `.sln`.
+*   **No Boilerplate**: Absolute prohibition of default template code (e.g., `Class1.cs`, `WeatherForecast.cs`, `UnitTest1.cs`). Delete them immediately.
 
 ---
 
-### IV. Auditability & Observability
+## 📡 2. API & Communication
 
-* Structured JSON logging with traceable user/action IDs
-* Immutable audit logs retained per policy
-* Health checks for liveness/readiness
+### IV. Routing & Versioning
+*   **Service Prefix**: All routes MUST be prefixed with the service domain (e.g., `/auth`, `/customer`, `/job`).
+*   **Versioning**: All API routes MUST be versioned (e.g., `/auth/v1/...`).
+*   **launchSettings**: `launchSettings.json` MUST be configured to automatically launch the **Scalar** documentation page.
 
-**Rationale:** Enables compliance, diagnostics, and operational insight.
+### V. Documentation
+*   **Scalar UI**: Use **Scalar** instead of Swagger for API documentation. Swagger/Swashbuckle packages are BANNED.
+*   **XML Documentation**: Mandatory XML comments on all public methods, properties, and classes.
 
----
-
-### V. Security & Compliance
-
-* JWT authentication, role-based authorization
-* Sensitive data encrypted at rest and in transit
-* Compliance with GDPR, Thai tax law, and all relevant regulations
+### VI. Messaging
+*   **Centralized Contracts**: All inter-service events MUST reside in `Maliev.MessagingContracts`. Local events are prohibited for inter-service communication.
 
 ---
 
-### VI. Secrets Management & Configuration Security (NON-NEGOTIABLE)
+## 🔒 3. Security & Authorization
 
-* No secrets in source code
-* Secrets injected from **Google Secret Manager**
-* Public repositories sanitized of real endpoints
-* Commits scanned for secrets before merge
+### VII. Permission System
+*   **GCP-Style Permissions**: Use resource-scoped permissions (e.g., `auth.tokens.revoke`, `job.jobs.read`).
+*   **Implementation**: Permissions must be defined as `static const string` and enforced using the custom `[RequirePermission]` attribute (not plain `[Authorize]`).
 
-**Rationale:** Prevents leaks and targeted attacks.
-
----
-
-### VII. Zero Warnings Policy (NON-NEGOTIABLE)
-
-* Builds must emit zero warnings
-* Warnings treated as build failures
-
-**Rationale:** Eliminates technical debt and instability.
+### VIII. Secrets & Credentials
+*   **Zero Secrets**: Absolute prohibition of secrets in the entire codebase. No hardcoded keys, passwords, or connection strings.
+*   **Environment Injection**: Use Google Cloud's **External Secrets Operator (ESO)** for production secrets.
+*   **NuGet Feed**: Connection to the private NuGet feed (for ServiceDefaults/Contracts) MUST use environment-variable-based credentials.
 
 ---
 
-### VIII. Clean Project Artifacts (NON-NEGOTIABLE)
+## 🛠️ 4. Development & Workflow
 
-* Remove unused files, outdated docs, and generated artifacts
-* `.gitignore` must exclude temporary files
-* Cleanup enforced pre-release
+### IX. Version Control
+*   **Feature Branches**: Use a feature-branch-oriented workflow. Development should happen on feature branches, issued into a PR for merge into `develop`.
+*   **LLM Metadata**: Committing `.claude`, `.gemini`, `.opencode`, `.specify`, etc., is allowed and encouraged.
+*   **Exclusions**: Never commit developer-specific settings (e.g., `*.local.json`, `.env`).
 
----
+### X. Code Quality
+*   **TreatWarningsAsErrors**: Mandatory. All warnings must be resolved correctly; suppression is prohibited.
+*   **Banned Libraries**: Strictly no **Swagger/Swashbuckle**, **FluentAssertions**, or **FluentValidation**.
+*   **Pre-commit**: Use `.pre-commit-config.yaml` for local linting and verification.
 
-### IX. Simplicity & Maintainability
-
-* Apply YAGNI
-* Favor readable, stateless design
-* Shared libraries must be versioned and documented
-
----
-
-### X. Business Metrics & Analytics (NON-NEGOTIABLE)
-
-* Every service must expose **business-relevant metrics and analytics endpoints** for use by the company’s telemetry pipeline.
-* Metrics must quantify both **system health** and **business outcomes**, including (where applicable):
-
-  * Number of processed jobs, quotes, or transactions
-  * Active users, conversion rates, and session durations
-  * Production throughput, revenue per feature, or machine utilization
-* Metrics must use **structured formats** compatible with Prometheus, OpenTelemetry, or other standard collectors.
-* Services must tag metrics with:
-
-  * `service_name`
-  * `version`
-  * `region`
-  * `environment` (dev/staging/prod)
-* Each release must define a clear mapping between **business objectives** and the metrics implemented.
-* Tests must validate the **presence and format** of required metrics endpoints.
-* Metrics must not expose confidential or personally identifiable information.
-
-**Rationale:** Analytics convert operational data into measurable business intelligence. This enables data-driven decisions for product strategy, cost optimization, and growth.
+### XI. GitHub Configuration
+*   **CODEOWNERS**: Mandatory at `.github/CODEOWNERS`.
+*   **Dependabot**: `dependabot.yml` is required in all services.
+*   **Workflows**: `.github/workflows` MUST include PR validation, Gemini workflows, and CI workflows for `dev`/`staging`/`main`.
 
 ---
 
-## Deployment & Operations Standards
+## 🧪 5. Testing & Validation
 
-* All services containerized via Docker
-* Configurable solely by environment variables
-* Rate limiting and recovery mechanisms mandatory
-* Services must emit metrics consumable by the central telemetry gateway
-* Metrics availability verified during deployment pipeline
+### XII. Testing Mandates
+*   **Code Coverage**: Minimum **80% coverage** required for all services.
+*   **Real Infrastructure**: Use **Testcontainers** for all integration tests. In-memory databases are prohibited.
 
 ---
 
-## Development Workflow
+## 📦 6. Containerization & Deployment
 
-**Mandatory sequence:**
+### XIII. Docker Standards
+*   **Location**: `Dockerfile` MUST be located in the API project folder.
+*   **Structure**: Use optimized, multi-stage builds.
+*   **Best Practices**: Use the built-in `app` user; ensure correct file ownership.
 
-1. Specification
-2. **Test Definition (includes metrics tests)**
-3. Implementation
-4. Validation (tests, coverage, analytics endpoints)
-5. Refactor
-
-* Pull requests without analytics instrumentation will be rejected.
-* CI/CD must verify both functional tests and metrics schema compliance.
+### XIV. GitOps & GKE
+*   **Deployments**: Managed via `maliev-gitops` using **ArgoCD**.
+*   **Infrastructure**: Standardized resource definitions for Redis, RabbitMQ, and Postgres across environments.
 
 ---
 
-## Security Compliance & Audit Requirements
-
-* Pre-commit scans for secrets and sensitive endpoints
-* Compromised credentials rotated within 24 hours
-* Quarterly audits of metrics exposure to ensure no PII leakage
-
----
-
-## Governance
-
-* Constitution supersedes developer preference.
-* All PRs validated for constitutional and analytics compliance.
-* Amendments require leadership approval and documented migration plan.
-* Violations block merge or deployment.
-
----
-
-**Version:** 1.2.0 | **Ratified:** 2025-10-02 | **Last Amended:** 2025-10-09
+**Version:** 2.0.0 | **Ratified:** 2026-02-22 | **Last Amended:** 2026-02-22

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj" />
+  <Project Path="Maliev.InvoiceService.Domain/Maliev.InvoiceService.Domain.csproj" />
+  <Project Path="Maliev.InvoiceService.Application/Maliev.InvoiceService.Application.csproj" />
+  <Project Path="Maliev.InvoiceService.Infrastructure/Maliev.InvoiceService.Infrastructure.csproj" />
+  <Project Path="Maliev.InvoiceService.Tests/Maliev.InvoiceService.Tests.csproj" />
+</Solution>
