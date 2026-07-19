@@ -1,21 +1,15 @@
-name: PR validation
+name: Pull Request Validation
 
 on:
   pull_request:
-    branches:
-      - develop
-      - main
 
 permissions:
   contents: read
 
-concurrency:
-  group: invoice-pr-validation-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  ServiceDefaultsVersion: 1.0.82-alpha
+  MessagingContractsVersion: 1.0.91-alpha
 
 jobs:
   validate:
-    name: validate
-    permissions:
-      contents: read
     uses: ./.github/workflows/_validate.yml

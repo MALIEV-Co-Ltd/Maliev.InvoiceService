@@ -1,30 +1,57 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# syntax=docker/dockerfile:1.7
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-preview AS base
-USER $APP_UID
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
+ARG dependency_restore_stage=restore-private
 
-
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:9.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build-base
 ARG BUILD_CONFIGURATION=Release
+ARG SERVICE_DEFAULTS_VERSION=1.0.82-alpha
+ARG MESSAGING_CONTRACTS_VERSION=1.0.91-alpha
+ENV GITHUB_ACTIONS=true
 WORKDIR /src
+
+COPY ["nuget.config", "."]
+COPY ["NuGet.PRValidation.Config", "."]
+COPY ["Directory.Build.props", "."]
 COPY ["Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj", "Maliev.InvoiceService.Api/"]
-RUN dotnet restore "./Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj"
+COPY ["Maliev.InvoiceService.Application/Maliev.InvoiceService.Application.csproj", "Maliev.InvoiceService.Application/"]
+COPY ["Maliev.InvoiceService.Domain/Maliev.InvoiceService.Domain.csproj", "Maliev.InvoiceService.Domain/"]
+COPY ["Maliev.InvoiceService.Infrastructure/Maliev.InvoiceService.Infrastructure.csproj", "Maliev.InvoiceService.Infrastructure/"]
+COPY [".ci-packages/", ".ci-packages/"]
+
+FROM build-base AS restore-private
+RUN --mount=type=secret,id=nuget_username,required=true \
+    --mount=type=secret,id=nuget_password,required=true \
+    NUGET_USERNAME="$(cat /run/secrets/nuget_username)" \
+    NUGET_PASSWORD="$(cat /run/secrets/nuget_password)" \
+    dotnet restore "./Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj" \
+      -p:ServiceDefaultsVersion=$SERVICE_DEFAULTS_VERSION \
+      -p:MessagingContractsVersion=$MESSAGING_CONTRACTS_VERSION
+
+FROM build-base AS restore-local
+RUN dotnet restore "./Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj" \
+      --configfile "NuGet.PRValidation.Config" \
+      -p:ServiceDefaultsVersion=$SERVICE_DEFAULTS_VERSION \
+      -p:MessagingContractsVersion=$MESSAGING_CONTRACTS_VERSION
+
+FROM ${dependency_restore_stage} AS build
 COPY . .
 WORKDIR "/src/Maliev.InvoiceService.Api"
-RUN dotnet build "./Maliev.InvoiceService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet publish "./Maliev.InvoiceService.Api.csproj" \
+      -c $BUILD_CONFIGURATION \
+      --no-restore \
+      -o /app/publish \
+      /p:UseAppHost=false \
+      -p:ServiceDefaultsVersion=$SERVICE_DEFAULTS_VERSION \
+      -p:MessagingContractsVersion=$MESSAGING_CONTRACTS_VERSION
 
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Maliev.InvoiceService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --chown=app:app --from=build /app/publish .
+
+USER app
+EXPOSE 8080
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_EnableDiagnostics=0
+
 ENTRYPOINT ["dotnet", "Maliev.InvoiceService.Api.dll"]

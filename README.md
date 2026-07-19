@@ -1,140 +1,158 @@
-# Maliev.InvoiceService
+# Maliev Invoice Service
 
-This project has undergone a comprehensive migration and API refinement to align with modern .NET development standards, focusing on improved maintainability, testability, security, and consistency with other services.
+[![Build Status](https://img.shields.io/badge/Build-Passing-success)](https://github.com/ORGANIZATION/Maliev.InvoiceService)
+[![.NET Version](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%2018-blue)](https://www.postgresql.org/)
 
-## Project Structure
+Comprehensive microservice for managing sales invoices, quotations, and commercial payments.
 
-The solution is now composed of three main projects:
+**Role in MALIEV Architecture**: The primary financial gateway for revenue tracking. It orchestrates the transformation of quotations into invoices, tracks payment allocations, and maintains the authoritative commercial audit trail for the entire platform.
 
-*   **`Maliev.InvoiceService.Api`**: The ASP.NET Core Web API project, responsible for handling HTTP requests, defining API contracts (using DTOs), and orchestrating business logic through a service layer. It now utilizes the minimal API hosting model (`Program.cs`) for configuration.
-*   **`Maliev.InvoiceService.Data`**: A .NET Standard library project, responsible for data access, containing the Entity Framework Core `DbContext` and entity models.
-*   **`Maliev.InvoiceService.Tests`**: A project containing unit and integration tests for the service and API layers.
+---
 
-## API Endpoints
+## 🏗️ Architecture & Tech Stack
 
-The API follows a RESTful design, with clear, hierarchical routes. The base address for this API is `https://api.maliev.com`.
+- **Framework**: ASP.NET Core 10.0 (C# 13)
+- **Database**: PostgreSQL 18 with Entity Framework Core 10.x
+- **Distributed Cache**: Redis 7.x (High-speed invoice caching)
+- **Messaging**: RabbitMQ via MassTransit
+- **API Documentation**: OpenAPI 3.1 + Scalar UI
+- **Observability**: OpenTelemetry (Metrics, Traces, Logging)
 
-### Invoices
+---
 
-*   **GET /invoices**: Retrieve a paginated collection of all invoices.
-    *   Query Parameters: `pageNumber`, `pageSize`
-    *   Example: `GET https://api.maliev.com/invoices?pageNumber=1&pageSize=10`
-*   **GET /api/invoices/{id}**: Retrieve a specific invoice by its unique ID.
-*   **GET /api/invoices/by-number/{number}**: Retrieve a specific invoice by its unique invoice number.
-*   **POST /api/invoices**: Create a new invoice.
-*   **PUT /api/invoices/{id}**: Fully update an existing invoice by its ID.
-*   **DELETE /api/invoices/{id}**: Delete a specific invoice by its ID.
+## ⚖️ Constitution Rules
 
-### Invoice Files
+This service strictly adheres to the platform development mandates:
 
-*   **GET /api/invoices/{invoiceId}/file**: Retrieve the invoice file (PDF) associated with a specific invoice.
-*   **POST /api/invoices/{invoiceId}/file**: Upload/create the invoice file for a specific invoice.
-*   **PUT /api/invoices/{invoiceId}/file**: Update the invoice file for a specific invoice.
-*   **DELETE /invoices/{invoiceId}/file**: Delete the invoice file associated with a specific invoice.
+### Banned Libraries
+To maintain high performance and low complexity, the following are **NOT** used:
+- ❌ **AutoMapper**: Explicit manual mapping only.
+- ❌ **FluentValidation**: Standard Data Annotations (`[Required]`, `[EmailAddress]`) only.
+- ❌ **FluentAssertions**: Standard xUnit `Assert` methods only.
+- ❌ **In-memory Test DB**: All integration tests use **Testcontainers** with real PostgreSQL 18.
 
-### Order Items
+### Mandatory Practices
+- ✅ **TreatWarningsAsErrors**: Enabled in all `.csproj` files.
+- ✅ **XML Documentation**: Required on all public methods and properties.
+- ✅ **No Secrets in Code**: All sensitive configuration injected via environment variables.
+- ✅ **No Test Config in Program.cs**: Test configuration in test fixtures only.
+- ✅ **IAM Integration**: Self-registers permissions with the IAM Service using GCP-style naming: `{service}.{resource}.{action}`.
 
-*   **GET /api/invoices/{invoiceId}/order-items**: Retrieve all order items belonging to a specific invoice.
-*   **GET /api/invoices/{invoiceId}/order-items/{orderItemId}**: Retrieve a specific order item for a specific invoice.
-*   **POST /invoices/{invoiceId}/order-items**: Create a new order item for a specific invoice.
-*   **PUT /api/invoices/{invoiceId}/order-items/{orderItemId}**: Fully update a specific order item for a specific invoice.
-*   **DELETE /invoices/{invoiceId}/order-items/{orderItemId}**: Delete a specific order item for a specific invoice.
+---
 
-## Build Instructions
+## ✨ Key Features
 
-To build the entire solution, navigate to the root directory (`R:\maliev\Maliev.InvoiceService`) and run:
+- **Sequential Number Generation**: Guaranteed atomic invoice numbering (INV-YYYY-XXXXX) backed by database sequences.
+- **Payment Reconciliation**: Precision allocation of payments to multiple invoices with dynamic status tracking.
+- **Audit-First Design**: Automatic, immutable audit logging via interceptors for all commercial mutations.
+- **Anti-Tamper Logic**: Database-level protection preventing the deletion or modification of finalized financial documents.
+- **Multi-Currency Support**: Fully integrated with the platform's exchange rate providers for international invoicing.
+- **Creator Ownership Scope**: `roles.invoice.creator` can create, read, update, split, and attach files only for invoices whose creation audit entry belongs to that principal.
 
-```bash
-dotnet build
-```
+---
 
-## Run Instructions
-
-To run the API project locally, navigate to the `Maliev.InvoiceService.Api` directory (`R:\maliev\Maliev.InvoiceService\Maliev.InvoiceService.Api`) and run:
-
-```bash
-dotnet run
-```
-
-This will start the API, and if configured, it will automatically open your browser to the Swagger UI. You can access the Swagger UI at `https://localhost:7000/invoices/swagger` (or your configured port).
-
-## Test Instructions
-
-To run the tests, navigate to the root directory (`R:\maliev\Maliev.InvoiceService`) and run:
-
-```bash
-dotnet test Maliev.InvoiceService.Tests/Maliev.InvoiceService.Tests.csproj
-```
-
-## Secret Management
-
-Sensitive information such as database connection strings and JWT keys are managed externally for both production and local development environments.
-
-### Production Secrets (Google Secret Manager)
-
-For production deployments, secrets are retrieved from Google Secret Manager. Ensure the following secrets are configured in your Google Cloud project (`maliev-website`):
-
-*   `ConnectionStrings-InvoiceServiceDbContext`: Your production database connection string.
-*   `JwtSecurityKey`: Your JWT security key.
-
-These secrets are accessed via Kubernetes `SecretProviderClass` during deployment.
-
-### Local Development Secrets (User Secrets)
-
-For local development, sensitive information is managed using .NET User Secrets. This keeps your secrets out of source control.
-
-To configure your local secrets:
-
-1.  Right-click on the `Maliev.InvoiceService.Api` project in Visual Studio.
-2.  Select "Manage User Secrets".
-3.  A `secrets.json` file will open. Paste the following structure into it and replace the placeholder values with your actual local development secrets:
-
-    ```json
-    {
-      "JwtSecurityKey": "YOUR_JWT_SECURITY_KEY",
-      "Jwt:Issuer": "YOUR_JWT_ISSUER",
-      "Jwt:Audience": "YOUR_JWT_AUDIENCE",
-      "ConnectionStrings:InvoiceServiceDbContext": "YOUR_LOCAL_DATABASE_CONNECTION_STRING"
-    }
-    ```
-    **Note:** The `JwtSecurityKey` is currently hardcoded in `Program.cs` for demonstration purposes. **It is crucial to replace this hardcoded key with a secure key loaded from configuration (e.g., User Secrets for local development, environment variables, or Google Secret Manager for production) before deploying to a production environment.**
-
-## Validation and release boundary
-
-Pull requests and pushes to `develop` or `main`, plus `release/v*` tag pushes, run the same read-only restore, dependency-audit, build, and test boundary. The validation workflows use only `contents: read`; they do not receive cloud or GitOps credentials.
-
-No workflow in this repository publishes an image, updates GitOps, or deploys a workload. Image publication and environment promotion remain disabled until the complete system passes Aspire owner review and a separate, explicitly approved release path is introduced. A successful validation status therefore proves source readiness only; it is not release authorization.
-
-## Deployment
-
-The project is configured for deployment to Kubernetes using Google Kubernetes Engine (GKE).
+## 🚀 Quick Start
 
 ### Prerequisites
+- .NET 10.0 SDK
+- Docker Desktop (for infrastructure)
+- PostgreSQL 18 (Alpine)
 
-*   `gcloud` CLI installed and configured.
-*   `kubectl` CLI installed and configured.
-*   Access to the `maliev-website` Google Cloud project.
-*   Docker installed.
+### Local Development Setup
 
-### Deployment Steps
+1. **Clone the repository**
+```bash
+git clone https://github.com/ORGANIZATION/Maliev.InvoiceService.git
+cd Maliev.InvoiceService
+```
 
-1.  **Build and Push Docker Image:**
-    Navigate to the project root (`R:\maliev\Maliev.InvoiceService`) and run the PowerShell script:
-    ```powershell
-    .\deploy.ps1
-    ```
-    This script will:
-    *   Replace the `##VERSION##` placeholder in `deployment.yaml` with a generated tag.
-    *   Authenticate Docker with Google Artifact Registry.
-    *   Build the Docker image for `Maliev.InvoiceService.Api`.
-    *   Push the Docker image to Google Artifact Registry.
-    *   Apply the `deployment.yaml` to your Kubernetes cluster.
-    *   Display pod and service information.
-    *   Revert the `##VERSION##` placeholder in `deployment.yaml`.
+2. **Spin up Infrastructure**
+```bash
+docker run --name invoice-db -e POSTGRES_PASSWORD=YOUR_PASSWORD -p 5432:5432 -d postgres:18-alpine
+docker run --name invoice-redis -p 6379:6379 -d redis:7-alpine
+```
 
-2.  **Apply Kubernetes Service:**
-    To apply or update the Kubernetes Service, run the PowerShell script:
-    ```powershell
-    .\deploy-service.ps1
-    ```
-    This script will apply the `service.yaml` to your Kubernetes cluster.
+3. **Configure Environment**
+```powershell
+# Windows PowerShell
+$env:ConnectionStrings__InvoiceDbContext="YOUR_POSTGRES_CONNECTION_STRING"
+$env:ConnectionStrings__Cache="YOUR_REDIS_CONNECTION_STRING"
+```
+
+4. **Apply Migrations & Run**
+```bash
+dotnet ef database update --project Maliev.InvoiceService.Infrastructure --startup-project Maliev.InvoiceService.Infrastructure
+dotnet run --project Maliev.InvoiceService.Api
+```
+
+The service will be available at `http://localhost:5000/invoices`. Access the interactive documentation at `http://localhost:5000/invoices/scalar`.
+
+---
+
+## 📡 API Endpoints
+
+All endpoints are prefixed with `/invoice/v1/`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/invoices` | Create a draft invoice |
+| GET | `/invoices/{id}` | Retrieve detailed invoice details |
+| POST | `/invoices/{id}/finalize` | Commit and finalize a draft invoice |
+| POST | `/payments` | Record and allocate a payment |
+
+---
+
+## Authorization Model
+
+- All controller actions use `[RequirePermission]` with `invoice.*` permission strings.
+- `roles.invoice.admin`, `roles.invoice.manager`, and `roles.invoice.accountant` are unrestricted financial roles for their granted actions.
+- `roles.invoice.creator` is intentionally object-scoped. Detail, search, update, delete, split, file, audit, currency-report, and payment-link routes check the invoice's `Created` audit log actor before returning or mutating data.
+- Search cache keys include the caller's invoice access scope. Do not add new invoice search caches without including the effective caller scope when results are object-filtered.
+- `InvoiceResponse.CreatedBy` is populated from the invoice creation audit entry so downstream services, including ReceiptService, can enforce their own creator-scoped workflows without guessing.
+- Service-to-service PDF reference registration uses `invoice.files.register` and remains reserved for trusted internal service accounts.
+
+---
+
+## 🏥 Health & Monitoring
+
+Standardized health probes for Kubernetes orchestration:
+- **Liveness**: `GET /invoices/liveness`
+- **Readiness**: `GET /invoices/readiness` (Checks DB and Redis connectivity)
+- **Metrics**: `GET /invoices/metrics` (Prometheus format)
+
+---
+
+## 🧪 Testing
+
+We prioritize reliable tests over mock-heavy unit tests.
+
+```bash
+# Run all tests using Testcontainers
+dotnet test --verbosity normal
+```
+
+- **Integration Tests**: Use real PostgreSQL 18 containers.
+- **Contract Tests**: Ensure API stability for consumers.
+
+---
+
+## ✅ Validation and release boundary
+
+Pull requests, `main`, `develop`, and `release/v*` tags run the same read-only
+.NET validation workflow. Validation checks out immutable public revisions of
+the MALIEV shared sources and restores only from NuGet.org, so it does not need
+repository secrets or package credentials.
+
+No workflow in this repository publishes images, authenticates to Google
+Cloud, changes GitOps, or deploys to GKE. Release must be introduced separately
+through an explicitly reviewed flow.
+
+- **Docker Image**: `REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/maliev-invoice-service:{sha}`
+- **Environments**: Development, Staging, Production
+
+---
+
+## 📄 License
+
+Proprietary - © 2025 MALIEV Co., Ltd. All rights reserved.
