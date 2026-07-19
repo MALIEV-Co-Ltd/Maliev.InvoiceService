@@ -9,7 +9,7 @@ EXPOSE 8081
 
 
 # This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:9.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-preview AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Maliev.InvoiceService.Api/Maliev.InvoiceService.Api.csproj", "Maliev.InvoiceService.Api/"]
